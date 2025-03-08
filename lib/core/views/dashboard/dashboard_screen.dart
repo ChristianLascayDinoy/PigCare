@@ -109,11 +109,11 @@ class DashboardScreen extends StatelessWidget {
             title: const Text('Settings'),
             onTap: () {},
           ),
-          ListTile(
+          /*ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Logout'),
             onTap: () {},
-          ),
+          ),*/
         ],
       ),
     );

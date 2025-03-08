@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
-import 'views/dashboard/dashboard_screen.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pigcare/core/models/pig_model.dart';
+import 'package:pigcare/core/models/pigpen_model.dart';
+import 'core/views/dashboard/dashboard_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Hive.initFlutter();
+  Hive.registerAdapter(PigAdapter());
+  Hive.registerAdapter(PigpenAdapter());
+  await Hive.openBox('pigpens'); // Open Hive box for pig pens
+  await Hive.openBox('pigs'); // Open Hive box for pigs
   runApp(const PigCareApp());
 }
 
