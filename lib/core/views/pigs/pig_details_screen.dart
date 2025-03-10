@@ -135,7 +135,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                       ? widget.pig.notes
                       : "No additional notes"),
               const SizedBox(height: 20),
-              Center(
+              /* Center(
                 child: ElevatedButton.icon(
                   onPressed: _editPigDetails,
                   icon: const Icon(Icons.edit),
@@ -145,7 +145,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                     foregroundColor: Colors.white,
                   ),
                 ),
-              ),
+              ),*/
             ],
           ),
         ),

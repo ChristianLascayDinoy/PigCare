@@ -260,7 +260,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text("Pig deleted"),
-                    backgroundColor: Colors.green,
+                    backgroundColor: Colors.red,
                   ),
                 );
               },
@@ -330,7 +330,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit,
-                          color: Colors.green), // Green edit button
+                          color: Colors.blue), // Green edit button
                       onPressed: () => _showPigDialog(index: index),
                     ),
                     IconButton(
