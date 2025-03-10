@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:pigcare/core/models/pig_model.dart';
 import 'pig_management_screen.dart';
 import '../../models/pigpen_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -7,6 +8,7 @@ class PigpenManagementScreen extends StatefulWidget {
   const PigpenManagementScreen({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _PigpenManagementScreenState createState() => _PigpenManagementScreenState();
 }
 
@@ -16,11 +18,13 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   void _showPigpenDialog({int? index}) {
     TextEditingController nameController = TextEditingController();
     TextEditingController descriptionController = TextEditingController();
+    List<Pig> existingPigs = []; // Ensure correct type
 
     if (index != null) {
       Pigpen pigpen = pigpenBox.getAt(index);
       nameController.text = pigpen.name;
       descriptionController.text = pigpen.description;
+      existingPigs = List<Pig>.from(pigpen.pigs); // FIX: Cast to List<Pig>
     }
 
     showDialog(
@@ -44,22 +48,23 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel")),
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel"),
+          ),
           ElevatedButton(
             onPressed: () {
               if (nameController.text.isNotEmpty) {
                 setState(() {
-                  Pigpen pigpen = Pigpen(
+                  Pigpen updatedPigpen = Pigpen(
                     name: nameController.text,
                     description: descriptionController.text,
-                    pigs: [],
+                    pigs: existingPigs, // Use the correctly cast list
                   );
 
                   if (index == null) {
-                    pigpenBox.add(pigpen);
+                    pigpenBox.add(updatedPigpen);
                   } else {
-                    pigpenBox.putAt(index, pigpen);
+                    pigpenBox.putAt(index, updatedPigpen);
                   }
                 });
                 Navigator.pop(context);
@@ -89,6 +94,9 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                 pigpenBox.deleteAt(index);
               });
               Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text("Pigpen deleted"),
+                  backgroundColor: Colors.red));
             },
             child: const Text("Delete"),
           ),
