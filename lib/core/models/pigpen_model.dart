@@ -14,5 +14,14 @@ class Pigpen extends HiveObject {
   @HiveField(2)
   List<Pig> pigs;
 
-  Pigpen({required this.name, required this.description, required this.pigs});
+  Pigpen({
+    required this.name,
+    required this.description,
+    this.pigs = const [],
+  });
+
+  // Add this method to easily save changes
+  Future<void> saveChanges() async {
+    await save();
+  }
 }

@@ -18,41 +18,53 @@ class PigAdapter extends TypeAdapter<Pig> {
     };
     return Pig(
       tag: fields[0] as String,
-      breed: fields[1] as String,
-      gender: fields[2] as String,
-      stage: fields[3] as String,
-      weight: fields[4] as String,
-      dob: fields[5] as String,
-      doe: fields[6] as String,
-      source: fields[7] as String,
-      notes: fields[8] as String,
-      imagePath: fields[9] as String?,
+      name: fields[1] as String?,
+      breed: fields[2] as String,
+      gender: fields[3] as String,
+      stage: fields[4] as String,
+      weight: fields[5] as double,
+      source: fields[6] as String,
+      dob: fields[7] as String,
+      doe: fields[8] as String,
+      motherTag: fields[9] as String?,
+      fatherTag: fields[10] as String?,
+      pigpen: fields[11] as String?,
+      notes: fields[12] as String?,
+      imagePath: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Pig obj) {
     writer
-      ..writeByte(10)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.tag)
       ..writeByte(1)
-      ..write(obj.breed)
+      ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.gender)
+      ..write(obj.breed)
       ..writeByte(3)
-      ..write(obj.stage)
+      ..write(obj.gender)
       ..writeByte(4)
-      ..write(obj.weight)
+      ..write(obj.stage)
       ..writeByte(5)
-      ..write(obj.dob)
+      ..write(obj.weight)
       ..writeByte(6)
-      ..write(obj.doe)
-      ..writeByte(7)
       ..write(obj.source)
+      ..writeByte(7)
+      ..write(obj.dob)
       ..writeByte(8)
-      ..write(obj.notes)
+      ..write(obj.doe)
       ..writeByte(9)
+      ..write(obj.motherTag)
+      ..writeByte(10)
+      ..write(obj.fatherTag)
+      ..writeByte(11)
+      ..write(obj.pigpen)
+      ..writeByte(12)
+      ..write(obj.notes)
+      ..writeByte(13)
       ..write(obj.imagePath);
   }
 

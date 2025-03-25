@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
 import '../pigs/pigpen_management_screen.dart';
 import '../feeds/feeds_screen.dart';
 import '../events/events_screen.dart';
@@ -13,6 +14,7 @@ class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _DashboardScreenState createState() => _DashboardScreenState();
 }
 
@@ -24,28 +26,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void initState() {
     super.initState();
     _loadTotalPigs();
-
-    // Listen for changes in the Hive box
-    Hive.box('pigpens').listenable().addListener(_loadTotalPigs);
+    Hive.box<Pigpen>('pigpens').listenable().addListener(_loadTotalPigs);
   }
 
   Future<void> _loadTotalPigs() async {
-    pigpenBox = Hive.box('pigpens');
+    pigpenBox = Hive.box<Pigpen>('pigpens');
     int count = 0;
 
     for (int i = 0; i < pigpenBox.length; i++) {
       final pigpen = pigpenBox.getAt(i) as Pigpen;
-      count += pigpen.pigs?.length ?? 0;
+      count += pigpen.pigs.length;
     }
 
     setState(() {
-      totalPigs = count; // Update UI when pig count changes
+      totalPigs = count;
     });
   }
 
   @override
   void dispose() {
-    // Remove the listener when the screen is closed
     Hive.box('pigpens').listenable().removeListener(_loadTotalPigs);
     super.dispose();
   }
@@ -53,9 +52,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[200],
       appBar: AppBar(
-        title: const Text("PigCare"),
+        title: const Text("🐷 PigCare Dashboard",
+            style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.green[700],
+        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.notifications),
@@ -64,67 +66,132 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       drawer: _buildDrawer(context),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: GridView.count(
-          crossAxisCount: 2, // Two columns
-          crossAxisSpacing: 16,
-          mainAxisSpacing: 16,
-          children: [
-            DashboardCard(
-              title: "Pigs",
-              icon: Icons.pets,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => PigpenManagementScreen()),
-                );
-              },
-              count: totalPigs, // Show total pigs from all pigpens
+      body: Column(
+        children: [
+          _buildSummaryCard(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: GridView.count(
+                crossAxisCount: 2,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                children: [
+                  DashboardCard(
+                    title: "Pigpens",
+                    icon: Icons.home,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => PigpenManagementScreen()),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Pigs",
+                    icon: Icons.pets,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => PigManagementScreen(
+                                  pigpenIndex: 0,
+                                )),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Feeds",
+                    icon: Icons.food_bank,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => FeedManagementScreen()),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Events",
+                    icon: Icons.event,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => EventsScreen()),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Expenses",
+                    icon: Icons.attach_money,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => ExpensesScreen()),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Sales",
+                    icon: Icons.shopping_cart,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => SalesScreen()),
+                      );
+                    },
+                  ),
+                  DashboardCard(
+                    title: "Reports",
+                    icon: Icons.bar_chart,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => ReportsScreen()),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
-            DashboardCard(
-              title: "Feeds",
-              icon: Icons.food_bank,
-              onTap: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => FeedsScreen()));
-              },
-            ),
-            DashboardCard(
-              title: "Events",
-              icon: Icons.event,
-              onTap: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => EventsScreen()));
-              },
-            ),
-            DashboardCard(
-              title: "Expenses",
-              icon: Icons.attach_money,
-              onTap: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => ExpensesScreen()));
-              },
-            ),
-            DashboardCard(
-              title: "Sales",
-              icon: Icons.shopping_cart,
-              onTap: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => SalesScreen()));
-              },
-            ),
-            DashboardCard(
-              title: "Reports",
-              icon: Icons.bar_chart,
-              onTap: () {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (context) => ReportsScreen()));
-              },
-            ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryCard() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            // ignore: deprecated_member_use
+            color: Colors.grey.withOpacity(0.2),
+            spreadRadius: 2,
+            blurRadius: 5,
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text("📦 Pigpens: ${pigpenBox.length}",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text("🐷 Total Pigs: $totalPigs",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+        ],
       ),
     );
   }

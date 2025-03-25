@@ -131,8 +131,8 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
               _buildDetailRow("Date of Entry", widget.pig.doe),
               _buildDetailRow(
                   "Notes",
-                  widget.pig.notes.isNotEmpty
-                      ? widget.pig.notes
+                  (widget.pig.notes ?? "").isNotEmpty
+                      ? widget.pig.notes!
                       : "No additional notes"),
               const SizedBox(height: 20),
               /* Center(
@@ -212,7 +212,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
   }
 
-  void _editPigDetails() async {
+  /* void _editPigDetails() async {
     //Edit
-  }
+  }*/
 }

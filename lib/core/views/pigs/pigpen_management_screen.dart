@@ -1,76 +1,140 @@
 import 'package:flutter/material.dart';
-import 'package:pigcare/core/models/pig_model.dart';
-import 'pig_management_screen.dart';
-import '../../models/pigpen_model.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import '../../models/pigpen_model.dart';
 
 class PigpenManagementScreen extends StatefulWidget {
   const PigpenManagementScreen({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
-  _PigpenManagementScreenState createState() => _PigpenManagementScreenState();
+  State<PigpenManagementScreen> createState() => _PigpenManagementScreenState();
 }
 
 class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
-  final Box pigpenBox = Hive.box('pigpens');
+  late final Box pigpenBox;
 
-  void _showPigpenDialog({int? index}) {
-    TextEditingController nameController = TextEditingController();
-    TextEditingController descriptionController = TextEditingController();
-    List<Pig> existingPigs = []; // Ensure correct type
+  @override
+  void initState() {
+    super.initState();
+    pigpenBox = Hive.box<Pigpen>('pigpens');
+  }
 
+  void _showAddEditDialog({int? index}) {
+    final formKey = GlobalKey<FormState>();
+    final nameController = TextEditingController();
+    final descriptionController = TextEditingController();
+
+    // If editing, populate fields with existing data
     if (index != null) {
-      Pigpen pigpen = pigpenBox.getAt(index);
+      final pigpen = pigpenBox.getAt(index) as Pigpen;
       nameController.text = pigpen.name;
       descriptionController.text = pigpen.description;
-      existingPigs = List<Pig>.from(pigpen.pigs); // FIX: Cast to List<Pig>
     }
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(index == null ? "Add Pigpen" : "Edit Pigpen"),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Pigpen Name"),
+      builder: (context) {
+        return AlertDialog(
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Text(index == null ? "Add New Pigpen" : "Edit Pigpen"),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    labelText: "Pigpen Name *",
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a name';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: descriptionController,
+                  decoration: const InputDecoration(
+                    labelText: "Description",
+                    border: OutlineInputBorder(),
+                  ),
+                  maxLines: 3,
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: descriptionController,
-              decoration: const InputDecoration(labelText: "Description"),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green[700],
+              ),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  _savePigpen(
+                    index: index,
+                    name: nameController.text,
+                    description: descriptionController.text,
+                  );
+                  Navigator.pop(context);
+                }
+              },
+              child: Text(
+                index == null ? "Add" : "Save",
+                style: const TextStyle(color: Colors.white),
+              ),
             ),
           ],
-        ),
+        );
+      },
+    );
+  }
+
+  void _savePigpen({
+    required String name,
+    required String description,
+    int? index,
+  }) {
+    final pigpen = Pigpen(
+      name: name,
+      description: description,
+      pigs: index != null ? (pigpenBox.getAt(index) as Pigpen).pigs : [],
+    );
+
+    setState(() {
+      if (index == null) {
+        pigpenBox.add(pigpen);
+      } else {
+        pigpenBox.putAt(index, pigpen);
+      }
+    });
+  }
+
+  void _confirmDelete(int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Deletion"),
+        content: const Text("Are you sure you want to delete this pigpen?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: const Text("Cancel"),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () {
-              if (nameController.text.isNotEmpty) {
-                setState(() {
-                  Pigpen updatedPigpen = Pigpen(
-                    name: nameController.text,
-                    description: descriptionController.text,
-                    pigs: existingPigs, // Use the correctly cast list
-                  );
-
-                  if (index == null) {
-                    pigpenBox.add(updatedPigpen);
-                  } else {
-                    pigpenBox.putAt(index, updatedPigpen);
-                  }
-                });
-                Navigator.pop(context);
-              }
+              _deletePigpen(index);
+              Navigator.pop(context);
             },
-            child: Text(index == null ? "Add" : "Save"),
+            child: const Text("Delete", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -78,29 +142,14 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   }
 
   void _deletePigpen(int index) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Delete Pigpen"),
-        content: const Text("Are you sure you want to delete this pigpen?"),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel")),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: () {
-              setState(() {
-                pigpenBox.deleteAt(index);
-              });
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                  content: Text("Pigpen deleted"),
-                  backgroundColor: Colors.red));
-            },
-            child: const Text("Delete"),
-          ),
-        ],
+    setState(() {
+      pigpenBox.deleteAt(index);
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("Pigpen deleted successfully"),
+        backgroundColor: Colors.red,
       ),
     );
   }
@@ -109,89 +158,109 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: const Text("Pigpen Management"),
-          backgroundColor: Colors.green),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ValueListenableBuilder(
-          valueListenable: pigpenBox.listenable(),
-          builder: (context, box, _) {
-            if (box.isEmpty) {
-              return const Center(child: Text("No pigpens added yet."));
-            }
+        title: const Text("Pigpen Management"),
+        centerTitle: true,
+        backgroundColor: Colors.green[700],
+      ),
+      body: ValueListenableBuilder(
+        valueListenable: Hive.box<Pigpen>('pigpens').listenable(),
+        builder: (context, Box box, _) {
+          if (box.isEmpty) {
+            return const Center(
+              child: Text(
+                "No pigpens available\nAdd your first pigpen!",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 18, color: Colors.grey),
+              ),
+            );
+          }
 
-            return GridView.builder(
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
                 childAspectRatio: 1.2,
               ),
               itemCount: box.length,
               itemBuilder: (context, index) {
-                Pigpen pigpen = box.getAt(index);
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            PigManagementScreen(pigpenIndex: index),
-                      ),
-                    );
-                  },
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(pigpen.name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 5),
-                          Text(
-                            pigpen.description.isNotEmpty
-                                ? pigpen.description
-                                : "No Description",
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey[600]),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.edit, color: Colors.blue),
-                                onPressed: () =>
-                                    _showPigpenDialog(index: index),
-                              ),
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.delete, color: Colors.red),
-                                onPressed: () => _deletePigpen(index),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
+                final pigpen = box.getAt(index) as Pigpen;
+                return _buildPigpenCard(pigpen, index);
               },
-            );
-          },
-        ),
+            ),
+          );
+        },
       ),
       floatingActionButton: FloatingActionButton(
-        backgroundColor: Colors.green,
-        onPressed: () => _showPigpenDialog(),
-        child: const Icon(Icons.add, size: 30),
+        onPressed: _showAddEditDialog,
+        backgroundColor: Colors.green[700],
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
+    );
+  }
+
+  Widget _buildPigpenCard(Pigpen pigpen, int index) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    pigpen.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Text(
+                  "${pigpen.pigs.length} pigs",
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.green[700],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: Text(
+                pigpen.description.isEmpty
+                    ? "No description"
+                    : pigpen.description,
+                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 20),
+                  color: Colors.blue,
+                  onPressed: () => _showAddEditDialog(index: index),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, size: 20),
+                  color: Colors.red,
+                  onPressed: () => _confirmDelete(index),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
