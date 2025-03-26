@@ -1,50 +1,53 @@
 import 'package:hive/hive.dart';
+import 'package:pigcare/core/models/pigpen_model.dart';
 
 part 'pig_model.g.dart';
 
 @HiveType(typeId: 1)
 class Pig extends HiveObject {
   @HiveField(0)
-  String tag; // Unique ID
+  final String tag;
 
   @HiveField(1)
-  String? name; // Optional Unique Name
+  final String? name;
 
   @HiveField(2)
-  String breed; // Breed of the pig
+  final String breed;
 
   @HiveField(3)
-  String gender; // Male / Female
+  final String gender;
 
   @HiveField(4)
-  String stage; // Pig growth stage
+  final String stage;
 
   @HiveField(5)
-  double weight; // Weight in kg
+  final double weight;
 
   @HiveField(6)
-  String source; // Purchased / Born on Farm / Other
+  final String source;
 
   @HiveField(7)
-  String dob; // Date of Birth (String format)
+  final String dob;
 
   @HiveField(8)
-  String doe; // Date of Entry (String format)
+  final String doe;
 
   @HiveField(9)
-  String? motherTag; // Mother's Tag Number (Optional)
+  final String? motherTag;
 
   @HiveField(10)
-  String? fatherTag; // Father's Tag Number (Optional)
+  final String? fatherTag;
 
   @HiveField(11)
-  String? pigpen; // Assigned Pigpen (or "Unassigned")
+  int? pigpenKey;
 
   @HiveField(12)
-  String? notes; // Additional notes
+  final String? notes;
 
   @HiveField(13)
-  String? imagePath; // Path for stored image
+  final String? imagePath;
+
+  String? get pigpen => null;
 
   Pig({
     required this.tag,
@@ -58,30 +61,48 @@ class Pig extends HiveObject {
     required this.doe,
     this.motherTag,
     this.fatherTag,
-    this.pigpen,
+    this.pigpenKey,
     this.notes,
     this.imagePath,
   });
 
-  /// **Calculate Age in Days**
+  // Helper method to get pigpen name
+  String? getPigpenName(List<Pigpen> allPigpens) {
+    if (pigpenKey == null) return null;
+    try {
+      return allPigpens.firstWhere((p) => p.key == pigpenKey).name;
+    } catch (e) {
+      return null;
+    }
+  }
+
   int get age {
     try {
       DateTime birthDate = DateTime.parse(dob);
       return DateTime.now().difference(birthDate).inDays;
     } catch (e) {
-      return 0; // Default to 0 if parsing fails
+      return 0;
     }
   }
 
-  /// **Convert Age to Weeks/Months**
   String getFormattedAge() {
     int days = age;
-    if (days < 7) {
-      return "$days days old";
-    } else if (days < 30) {
-      return "${(days / 7).floor()} weeks old";
-    } else {
-      return "${(days / 30).floor()} months old";
+    if (days < 7) return "$days days old";
+    if (days < 30) return "${(days / 7).floor()} weeks old";
+    return "${(days / 30).floor()} months old";
+  }
+
+  bool get isSexuallyMature => age > 180;
+
+  bool canBeParentOf(Pig offspring) {
+    try {
+      final parentDob = DateTime.parse(dob);
+      final childDob = DateTime.parse(offspring.dob);
+      return childDob.isAfter(parentDob);
+    } catch (e) {
+      return false;
     }
   }
+
+  String get genderSymbol => gender == 'Male' ? '♂' : '♀';
 }

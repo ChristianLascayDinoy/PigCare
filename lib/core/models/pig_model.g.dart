@@ -28,7 +28,7 @@ class PigAdapter extends TypeAdapter<Pig> {
       doe: fields[8] as String,
       motherTag: fields[9] as String?,
       fatherTag: fields[10] as String?,
-      pigpen: fields[11] as String?,
+      pigpenKey: fields[11] as int?,
       notes: fields[12] as String?,
       imagePath: fields[13] as String?,
     );
@@ -61,7 +61,7 @@ class PigAdapter extends TypeAdapter<Pig> {
       ..writeByte(10)
       ..write(obj.fatherTag)
       ..writeByte(11)
-      ..write(obj.pigpen)
+      ..write(obj.pigpenKey)
       ..writeByte(12)
       ..write(obj.notes)
       ..writeByte(13)
