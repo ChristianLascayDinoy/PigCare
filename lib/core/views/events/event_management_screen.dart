@@ -8,8 +8,11 @@ class EventManagementScreen extends StatefulWidget {
   final List<Pig> allPigs;
   final List<String> initialSelectedPigs;
 
-  const EventManagementScreen(
-      {super.key, required this.allPigs, required this.initialSelectedPigs});
+  const EventManagementScreen({
+    super.key,
+    required this.allPigs,
+    required this.initialSelectedPigs,
+  });
 
   @override
   State<EventManagementScreen> createState() => _EventManagementScreenState();
@@ -20,6 +23,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   List<PigEvent> _allEvents = [];
   String _searchQuery = '';
   String _filterType = 'All';
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -28,22 +32,46 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   Future<void> _initHive() async {
-    _eventsBox = Hive.box<PigEvent>('pig_events');
-    _loadEvents();
+    try {
+      _eventsBox = await Hive.openBox<PigEvent>('pig_events');
+      _loadEvents();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error initializing database: $e')),
+        );
+      }
+    }
   }
 
-  void _loadEvents() {
-    setState(() {
-      _allEvents = _eventsBox.values.toList();
-    });
+  Future<void> _loadEvents() async {
+    if (_isLoading) return;
+    setState(() => _isLoading = true);
+
+    try {
+      final events = _eventsBox.values.toList();
+      setState(() => _allEvents = events);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading events: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   List<PigEvent> get _filteredEvents {
     var filtered = _allEvents.where((event) {
-      final matchesSearch = event.name
-              .toLowerCase()
-              .contains(_searchQuery.toLowerCase()) ||
-          event.description.toLowerCase().contains(_searchQuery.toLowerCase());
+      final matchesSearch =
+          event.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              (event.description
+                      ?.toLowerCase()
+                      .contains(_searchQuery.toLowerCase()) ??
+                  false);
       final matchesType =
           _filterType == 'All' || event.eventType == _filterType;
       return matchesSearch && matchesType;
@@ -63,7 +91,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: _showAddEventDialog,
+            onPressed: () => _showAddEventDialog(context),
             tooltip: 'Add new event',
           ),
         ],
@@ -72,10 +100,16 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         children: [
           _buildSearchAndFilter(),
           Expanded(
-            child: _buildEventList(),
+            child: _isLoading ? _buildLoadingIndicator() : _buildEventList(),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLoadingIndicator() {
+    return const Center(
+      child: CircularProgressIndicator(),
     );
   }
 
@@ -127,95 +161,214 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       );
     }
 
-    return ListView.builder(
-      itemCount: _filteredEvents.length,
-      itemBuilder: (context, index) {
-        final event = _filteredEvents[index];
-        return _buildEventCard(event);
-      },
+    return RefreshIndicator(
+      onRefresh: _loadEvents,
+      child: ListView.builder(
+        padding: const EdgeInsets.only(bottom: 16),
+        itemCount: _filteredEvents.length,
+        itemBuilder: (context, index) {
+          final event = _filteredEvents[index];
+          return _buildEventCard(event);
+        },
+      ),
     );
   }
 
   Widget _buildEventCard(PigEvent event) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  event.name,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => _showEventDetails(context, event),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      event.name,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-                Chip(
-                  label: Text(event.eventType),
-                  backgroundColor: _getEventTypeColor(event.eventType),
+                  Chip(
+                    label: Text(event.eventType),
+                    backgroundColor: _getEventTypeColor(event.eventType),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: Colors.grey[600],
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    DateFormat('MMM dd, yyyy').format(event.date),
+                    style: TextStyle(
+                      color: event.isUpcoming ? Colors.green[700] : Colors.grey,
+                    ),
+                  ),
+                  if (event.isUpcoming) ...[
+                    const Spacer(),
+                    Chip(
+                      label: const Text("Upcoming"),
+                      backgroundColor: Colors.green[50],
+                      labelStyle: const TextStyle(color: Colors.green),
+                    ),
+                  ],
+                ],
+              ),
+              if (event.description != null &&
+                  event.description!.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  event.description!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              DateFormat('MMM dd, yyyy').format(event.date),
-              style: TextStyle(
-                color: event.isUpcoming ? Colors.green[700] : Colors.grey,
-              ),
-            ),
-            if (event.isUpcoming)
-              Chip(
-                label: const Text("Upcoming"),
-                backgroundColor: Colors.green[50],
-              ),
-            const SizedBox(height: 8),
-            Text(
-              event.description,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              "Pigs: ${event.pigTags.length}",
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            if (event.isUpcoming) ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => _markEventAsComplete(event),
-                  child: const Text("Mark Complete"),
-                ),
+              Text(
+                "Pigs: ${event.pigTags.length}",
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
+              if (event.isUpcoming) ...[
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => _markEventAsComplete(event),
+                      child: const Text("Mark Complete"),
+                    ),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 20),
+                      onPressed: () => _showEventDetails(context, event),
+                      tooltip: 'Edit event',
+                    ),
+                  ],
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
   Future<void> _markEventAsComplete(PigEvent event) async {
-    final updatedEvent = PigEvent(
-      id: event.id,
-      name: event.name,
-      date: DateTime.now(), // Set to current time when completed
-      description: event.description,
-      pigTags: event.pigTags,
-      eventType: event.eventType,
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Completion"),
+        content: const Text("Mark this event as completed?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
     );
 
-    await _eventsBox.put(event.id, updatedEvent);
-    _loadEvents();
+    if (confirmed == true && mounted) {
+      try {
+        final updatedEvent = PigEvent(
+          id: event.id,
+          name: event.name,
+          date: DateTime.now(),
+          description: event.description,
+          pigTags: event.pigTags,
+          eventType: event.eventType,
+        );
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event marked as complete')),
-      );
+        await _eventsBox.put(event.id, updatedEvent);
+        await _loadEvents();
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Event marked as complete')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _showAddEventDialog(BuildContext context) async {
+    final result = await Navigator.of(context).push<PigEvent>(
+      MaterialPageRoute(
+        builder: (context) => AddEditEventDialog(
+          allPigs: widget.allPigs,
+          existingEvent: null,
+          initialSelectedPigs: widget.initialSelectedPigs,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _saveEvent(result);
+    }
+  }
+
+  Future<void> _showEventDetails(BuildContext context, PigEvent event) async {
+    final result = await Navigator.of(context).push<PigEvent>(
+      MaterialPageRoute(
+        builder: (context) => AddEditEventDialog(
+          allPigs: widget.allPigs,
+          existingEvent: event,
+          initialSelectedPigs: event.pigTags,
+        ),
+        fullscreenDialog: true,
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _saveEvent(result);
+    }
+  }
+
+  Future<void> _saveEvent(PigEvent event) async {
+    try {
+      await _eventsBox.put(event.id, event);
+      await _loadEvents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Event saved successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving event: $e')),
+        );
+      }
     }
   }
 
@@ -231,88 +384,6 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         return Colors.blue[100]!;
       default:
         return Colors.grey[200]!;
-    }
-  }
-
-  Future<void> _showAddEventDialog() async {
-    final result = await showDialog<PigEvent>(
-      context: context,
-      builder: (context) => AddEditEventDialog(
-        allPigs: widget.allPigs,
-        existingEvent: null,
-        initialSelectedPigs: widget.initialSelectedPigs,
-      ),
-    );
-
-    if (result != null) {
-      await _saveEvent(result);
-    }
-  }
-
-  Future<void> _showEventDetails(PigEvent event) async {
-    final result = await showDialog<PigEvent?>(
-      context: context,
-      builder: (context) => AddEditEventDialog(
-        allPigs: widget.allPigs,
-        existingEvent: event,
-        initialSelectedPigs: event.pigTags,
-      ),
-    );
-
-    if (result != null) {
-      await _saveEvent(result);
-    }
-  }
-
-  Future<void> _saveEvent(PigEvent event) async {
-    try {
-      await _eventsBox.put(event.id, event);
-      _loadEvents();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event saved successfully')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving event: ${e.toString()}')));
-      }
-    }
-  }
-
-  Future<void> _deleteEvent(PigEvent event) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: const Text("Are you sure you want to delete this event?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await _eventsBox.delete(event.id);
-        _loadEvents();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Event deleted successfully')));
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error deleting event: ${e.toString()}')));
-        }
-      }
     }
   }
 }
@@ -370,14 +441,22 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title:
-          Text(widget.existingEvent != null ? "Edit Event" : "Add New Event"),
-      content: SingleChildScrollView(
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.existingEvent != null ? "Edit Event" : "Add Event"),
+        actions: [
+          if (widget.existingEvent != null)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: _confirmDelete,
+            ),
+        ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
                 controller: _nameController,
@@ -425,34 +504,35 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
-                  labelText: "Description *",
+                  labelText: "Description (Optional)",
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
-                validator: (value) =>
-                    value?.isEmpty ?? true ? 'Required field' : null,
               ),
               const SizedBox(height: 16),
               _buildPigSelection(),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel"),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _saveEvent,
+                      child: const Text("Save"),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        if (widget.existingEvent != null)
-          TextButton(
-            onPressed: () => _confirmDelete(),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: _saveEvent,
-          child: const Text("Save"),
-        ),
-      ],
     );
   }
 
@@ -468,29 +548,36 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
         Container(
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(4),
+            borderRadius: BorderRadius.circular(8),
           ),
           constraints: const BoxConstraints(maxHeight: 200),
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: widget.allPigs.length,
-            itemBuilder: (context, index) {
-              final pig = widget.allPigs[index];
-              return CheckboxListTile(
-                title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
-                value: _selectedPigTags.contains(pig.tag),
-                onChanged: (selected) {
-                  setState(() {
-                    if (selected == true) {
-                      _selectedPigTags.add(pig.tag);
-                    } else {
-                      _selectedPigTags.remove(pig.tag);
-                    }
-                  });
-                },
-              );
-            },
-          ),
+          child: widget.allPigs.isEmpty
+              ? const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: Text("No pigs available to select"),
+                  ),
+                )
+              : ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: widget.allPigs.length,
+                  itemBuilder: (context, index) {
+                    final pig = widget.allPigs[index];
+                    return CheckboxListTile(
+                      title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
+                      value: _selectedPigTags.contains(pig.tag),
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected == true) {
+                            _selectedPigTags.add(pig.tag);
+                          } else {
+                            _selectedPigTags.remove(pig.tag);
+                          }
+                        });
+                      },
+                    );
+                  },
+                ),
         ),
         if (_selectedPigTags.isEmpty)
           const Padding(
@@ -512,22 +599,27 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       lastDate: DateTime(2100),
     );
     if (picked != null && picked != _selectedDate) {
-      setState(() {
-        _selectedDate = picked;
-      });
+      setState(() => _selectedDate = picked);
     }
   }
 
   Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedPigTags.isEmpty) return;
+    if (_selectedPigTags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select at least one pig')),
+      );
+      return;
+    }
 
     final event = PigEvent(
       id: widget.existingEvent?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text,
       date: _selectedDate,
-      description: _descriptionController.text,
+      description: _descriptionController.text.isNotEmpty
+          ? _descriptionController.text
+          : '',
       pigTags: _selectedPigTags,
       eventType: _selectedEventType,
     );
@@ -554,8 +646,8 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       ),
     );
 
-    if (confirmed == true) {
-      Navigator.pop(context, null); // Return null to indicate deletion
+    if (confirmed == true && mounted) {
+      Navigator.pop(context, null);
     }
   }
 }

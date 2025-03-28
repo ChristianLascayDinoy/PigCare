@@ -85,9 +85,9 @@ Future<void> _initializeHive() async {
   await Future.wait([
     _openBox<Pigpen>('pigpens'),
     _openBox<Pig>('pigs'),
-    Hive.openBox<Feed>('feeds'),
+    _openBox<Feed>('feeds'),
     _openBox<FeedingSchedule>('feedingSchedules'),
-    Hive.openBox<PigEvent>('pig_events'),
+    _openBox<PigEvent>('pig_events'),
   ]);
 }
 
