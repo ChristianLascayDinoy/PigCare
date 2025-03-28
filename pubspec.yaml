@@ -39,6 +39,8 @@ dependencies:
   hive: ^2.2.3
   provider: ^6.1.2
   shared_preferences: ^2.5.2
+  intl: ^0.20.2
+  share: ^2.0.4
 
 dev_dependencies:
   flutter_test:

@@ -12,7 +12,6 @@ class PigpenManagementScreen extends StatefulWidget {
 class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   late final Box<Pigpen> _pigpenBox;
   final Set<String> _existingNames = {};
-  final _searchController = TextEditingController();
   String _searchQuery = '';
 
   @override
@@ -20,15 +19,6 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
     super.initState();
     _pigpenBox = Hive.box<Pigpen>('pigpens');
     _loadExistingNames();
-    _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text.toLowerCase());
-    });
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 
   void _loadExistingNames() {
@@ -104,7 +94,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Theme.of(context).primaryColor,
+              backgroundColor: Colors.green[700],
             ),
             onPressed: () async {
               if (formKey.currentState!.validate()) {
@@ -116,9 +106,9 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                 if (mounted) Navigator.pop(context);
               }
             },
-            child: Text(
-              pigpen == null ? "Add" : "Save",
-              style: const TextStyle(color: Colors.white),
+            child: const Text(
+              "Save",
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],
@@ -140,12 +130,12 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
         );
         await _pigpenBox.add(newPigpen);
       } else {
-        // Update existing pigpen
+        // Update existing pigpen by putting the updated copy back with the same key
         final updated = pigpen.copyWith(
           name: name,
           description: description,
         );
-        await updated.save();
+        await _pigpenBox.put(pigpen.key, updated);
       }
 
       _loadExistingNames();
@@ -157,7 +147,6 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                   ? "Pigpen added successfully"
                   : "Pigpen updated successfully",
             ),
-            backgroundColor: Colors.green,
           ),
         );
       }
@@ -170,6 +159,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
           ),
         );
       }
+      debugPrint('Error saving pigpen: $e');
     }
   }
 
@@ -189,7 +179,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Confirm Deletion"),
+        title: const Text("Confirm Delete"),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -209,10 +199,9 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
             onPressed: () => Navigator.pop(context, false),
             child: const Text("Cancel"),
           ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.white)),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -238,7 +227,6 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Pigpen deleted successfully"),
-            backgroundColor: Colors.red,
           ),
         );
       }
@@ -278,61 +266,74 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
       appBar: AppBar(
         title: const Text("Pigpen Management"),
         centerTitle: true,
+        backgroundColor: Colors.green[700],
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              showSearch(
-                context: context,
-                delegate: PigpenSearchDelegate(_pigpenBox.values.toList()),
-              );
-            },
+            icon: const Icon(Icons.add),
+            onPressed: () => _showAddEditDialog(),
+            tooltip: 'Add new pigpen',
           ),
         ],
       ),
-      body: ValueListenableBuilder<Box<Pigpen>>(
-        valueListenable: _pigpenBox.listenable(),
-        builder: (context, box, _) {
-          final pigpens = box.values.toList().cast<Pigpen>();
-          final filteredPigpens = _filterPigpens(pigpens);
-
-          if (filteredPigpens.isEmpty) {
-            return Center(
-              child: Text(
-                _searchQuery.isEmpty
-                    ? "No pigpens available\nAdd your first pigpen!"
-                    : "No pigpens match your search",
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 18, color: Colors.grey),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              decoration: InputDecoration(
+                hintText: 'Search pigpens...',
+                prefixIcon: const Icon(Icons.search),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
               ),
-            );
-          }
+              onChanged: (value) => setState(() => _searchQuery = value),
+            ),
+          ),
+          Expanded(
+            child: ValueListenableBuilder<Box<Pigpen>>(
+              valueListenable: _pigpenBox.listenable(),
+              builder: (context, box, _) {
+                final pigpens = box.values.toList().cast<Pigpen>();
+                final filteredPigpens = _filterPigpens(pigpens);
 
-          return Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: GridView.builder(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.2,
-              ),
-              itemCount: filteredPigpens.length,
-              itemBuilder: (context, index) {
-                final pigpen = filteredPigpens[index];
-                return _PigpenCard(
-                  pigpen: pigpen,
-                  onEdit: () => _showAddEditDialog(pigpen: pigpen),
-                  onDelete: () => _confirmDelete(pigpen),
+                if (filteredPigpens.isEmpty) {
+                  return Center(
+                    child: Text(
+                      _searchQuery.isEmpty
+                          ? "No pigpens available\nAdd your first pigpen!"
+                          : "No pigpens match your search",
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 18, color: Colors.grey),
+                    ),
+                  );
+                }
+
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.2,
+                    ),
+                    itemCount: filteredPigpens.length,
+                    itemBuilder: (context, index) {
+                      final pigpen = filteredPigpens[index];
+                      return _PigpenCard(
+                        pigpen: pigpen,
+                        onEdit: () => _showAddEditDialog(pigpen: pigpen),
+                        onDelete: () => _confirmDelete(pigpen),
+                      );
+                    },
+                  ),
                 );
               },
             ),
-          );
-        },
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showAddEditDialog(),
-        child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
@@ -354,12 +355,12 @@ class _PigpenCard extends StatelessWidget {
     final isUnassigned = pigpen.name == "Unassigned";
 
     return Card(
-      elevation: 4,
+      elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // TODO: Navigate to pigpen details screen
+          // TODO: Navigate to pigpen details
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -380,11 +381,19 @@ class _PigpenCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Text(
-                    "${pigpen.pigs.length} pigs",
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).primaryColor,
+                  Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      "${pigpen.pigs.length}",
+                      style: TextStyle(
+                        color: Colors.green[800],
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                 ],
@@ -403,7 +412,6 @@ class _PigpenCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(height: 8),
               if (!isUnassigned)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -424,69 +432,6 @@ class _PigpenCard extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class PigpenSearchDelegate extends SearchDelegate {
-  final List<Pigpen> pigpens;
-
-  PigpenSearchDelegate(this.pigpens);
-
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-        icon: const Icon(Icons.clear),
-        onPressed: () {
-          query = '';
-        },
-      ),
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      icon: const Icon(Icons.arrow_back),
-      onPressed: () {
-        close(context, null);
-      },
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    return _buildSearchResults();
-  }
-
-  Widget _buildSearchResults() {
-    final results = query.isEmpty
-        ? pigpens
-        : pigpens.where((p) {
-            return p.name.toLowerCase().contains(query.toLowerCase()) ||
-                p.description.toLowerCase().contains(query.toLowerCase());
-          }).toList();
-
-    return ListView.builder(
-      itemCount: results.length,
-      itemBuilder: (context, index) {
-        final pigpen = results[index];
-        return ListTile(
-          title: Text(pigpen.name),
-          subtitle: Text(pigpen.description),
-          trailing: Text("${pigpen.pigs.length} pigs"),
-          onTap: () {
-            // TODO: Navigate to pigpen details
-            close(context, pigpen);
-          },
-        );
-      },
     );
   }
 }

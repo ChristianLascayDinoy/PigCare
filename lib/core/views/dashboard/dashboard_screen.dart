@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
 import '../pigs/pigpen_management_screen.dart';
 import '../feeds/feeds_screen.dart';
-import '../events/events_screen.dart';
+import '../events/event_management_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../sales/sales_screen.dart';
 import '../reports/reports_screen.dart';
@@ -97,6 +98,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         MaterialPageRoute(
                             builder: (context) => PigManagementScreen(
                                   pigpenIndex: 0,
+                                  allPigs: [],
+                                  pig: Pig(
+                                      tag: '',
+                                      breed: '',
+                                      gender: '',
+                                      stage: '',
+                                      weight: 0,
+                                      source: '',
+                                      dob: '',
+                                      doe: ''),
                                 )),
                       );
                     },
@@ -118,7 +129,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => EventsScreen()),
+                        MaterialPageRoute(
+                            builder: (context) => EventManagementScreen(
+                                  allPigs: [],
+                                  initialSelectedPigs: [],
+                                )),
                       );
                     },
                   ),

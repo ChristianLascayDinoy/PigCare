@@ -20,7 +20,7 @@ class Pigpen extends HiveObject {
     List<Pig>? pigs,
   }) : pigs = pigs ?? [];
 
-  /// Creates a deep copy of the pigpen
+  /// Creates a copy of the pigpen with new values
   Pigpen copyWith({
     String? name,
     String? description,
@@ -35,6 +35,9 @@ class Pigpen extends HiveObject {
 
   /// Adds a pig to this pigpen and updates its reference
   Future<void> addPig(Pig pig) async {
+    if (containsPigWithTag(pig.tag)) {
+      throw Exception('Pig with tag ${pig.tag} already exists in this pigpen');
+    }
     pigs.add(pig);
     pig.pigpenKey = key;
     await pig.save();
@@ -43,6 +46,8 @@ class Pigpen extends HiveObject {
 
   /// Removes a pig from this pigpen and clears its reference
   Future<void> removePig(Pig pig) async {
+    if (!pigs.contains(pig)) return;
+
     pigs.remove(pig);
     pig.pigpenKey = null;
     await pig.save();
@@ -51,32 +56,22 @@ class Pigpen extends HiveObject {
 
   /// Transfers pigs from another pigpen to this one
   Future<void> transferPigs(List<Pig> pigsToTransfer) async {
+    final box = Hive.box<Pigpen>('pigpens');
+
     for (final pig in pigsToTransfer) {
       // Remove from current pigpen if it exists
       if (pig.pigpenKey != null) {
-        final currentPen = Hive.box<Pigpen>('pigpens').get(pig.pigpenKey);
-        if (currentPen != null) {
+        final currentPen = box.get(pig.pigpenKey);
+        if (currentPen != null && currentPen != this) {
           await currentPen.removePig(pig);
         }
       }
 
-      // Add to this pigpen
-      await addPig(pig);
+      // Add to this pigpen if not already present
+      if (!containsPigWithTag(pig.tag)) {
+        await addPig(pig);
+      }
     }
-  }
-
-  /// Updates the pigpen name and maintains all references
-  Future<void> updateName(String newName) async {
-    final box = Hive.box<Pigpen>('pigpens');
-    final updated = copyWith(name: newName);
-    await box.put(key, updated);
-  }
-
-  /// Updates the pigpen description
-  Future<void> updateDescription(String newDescription) async {
-    final box = Hive.box<Pigpen>('pigpens');
-    final updated = copyWith(description: newDescription);
-    await box.put(key, updated);
   }
 
   /// Gets the count of pigs in this pen
@@ -85,8 +80,16 @@ class Pigpen extends HiveObject {
   /// Gets the average weight of pigs in this pen
   double get averageWeight {
     if (pigs.isEmpty) return 0;
-    final total = pigs.fold(0.0, (sum, pig) => sum + pig.weight);
-    return total / pigs.length;
+    return pigs.map((p) => p.weight).reduce((a, b) => a + b) / pigs.length;
+  }
+
+  /// Gets the count of pigs by gender
+  Map<String, int> get genderCount {
+    final count = {'Male': 0, 'Female': 0};
+    for (final pig in pigs) {
+      count[pig.gender] = (count[pig.gender] ?? 0) + 1;
+    }
+    return count;
   }
 
   /// Checks if the pigpen contains a pig with the given tag
@@ -94,21 +97,41 @@ class Pigpen extends HiveObject {
     return pigs.any((pig) => pig.tag == tag);
   }
 
+  /// Gets pigs by stage (Piglet, Weaner, etc.)
+  List<Pig> getPigsByStage(String stage) {
+    return pigs.where((pig) => pig.stage == stage).toList();
+  }
+
+  /// Calculates total feed consumption (if you have feed data)
+  /*double calculateDailyFeedConsumption() {
+    return pigs.fold(0.0, (sum, pig) => sum + pig.dailyFeedRequirement);
+  }*/
+
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is Pigpen &&
           runtimeType == other.runtimeType &&
+          key == other.key && // Compare by Hive key
           name == other.name &&
-          description == other.description &&
-          pigs.length == other.pigs.length;
+          description == other.description;
 
   @override
-  int get hashCode =>
-      name.hashCode ^ description.hashCode ^ pigs.length.hashCode;
+  int get hashCode => key.hashCode ^ name.hashCode ^ description.hashCode;
 
   @override
   String toString() {
     return 'Pigpen{name: $name, description: $description, pigCount: $pigCount}';
+  }
+
+  // JSON serialization
+  Map<String, dynamic> toJson() {
+    return {
+      'key': key,
+      'name': name,
+      'description': description,
+      'pigCount': pigCount,
+      'averageWeight': averageWeight,
+    };
   }
 }

@@ -47,8 +47,6 @@ class Pig extends HiveObject {
   @HiveField(13)
   final String? imagePath;
 
-  String? get pigpen => null;
-
   Pig({
     required this.tag,
     this.name,
@@ -66,7 +64,6 @@ class Pig extends HiveObject {
     this.imagePath,
   });
 
-  // Helper method to get pigpen name
   String? getPigpenName(List<Pigpen> allPigpens) {
     if (pigpenKey == null) return null;
     try {
@@ -78,7 +75,7 @@ class Pig extends HiveObject {
 
   int get age {
     try {
-      DateTime birthDate = DateTime.parse(dob);
+      final birthDate = DateTime.parse(dob);
       return DateTime.now().difference(birthDate).inDays;
     } catch (e) {
       return 0;
@@ -86,13 +83,16 @@ class Pig extends HiveObject {
   }
 
   String getFormattedAge() {
-    int days = age;
-    if (days < 7) return "$days days old";
-    if (days < 30) return "${(days / 7).floor()} weeks old";
-    return "${(days / 30).floor()} months old";
+    final days = age;
+    if (days < 7) return "$days days";
+    if (days < 30) return "${(days / 7).floor()} weeks";
+    if (days < 365) return "${(days / 30).floor()} months";
+    return "${(days / 365).floor()} years";
   }
 
-  bool get isSexuallyMature => age > 180;
+  bool get isSexuallyMature {
+    return age > 180; // Approximately 6 months
+  }
 
   bool canBeParentOf(Pig offspring) {
     try {
@@ -105,4 +105,59 @@ class Pig extends HiveObject {
   }
 
   String get genderSymbol => gender == 'Male' ? '♂' : '♀';
+
+  Future<void> assignToPigpen(Pigpen pigpen) async {
+    // Remove from current pen if exists
+    if (pigpenKey != null) {
+      final currentPen = Hive.box<Pigpen>('pigpens').get(pigpenKey);
+      if (currentPen != null) {
+        currentPen.pigs.removeWhere((p) => p.tag == tag);
+        await currentPen.save();
+      }
+    }
+
+    // Add to new pen
+    pigpenKey = pigpen.key;
+    pigpen.pigs.add(this);
+    await pigpen.save();
+    await save();
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'tag': tag,
+      'name': name,
+      'breed': breed,
+      'gender': gender,
+      'stage': stage,
+      'weight': weight,
+      'source': source,
+      'dob': dob,
+      'doe': doe,
+      'motherTag': motherTag,
+      'fatherTag': fatherTag,
+      'pigpenKey': pigpenKey,
+      'notes': notes,
+      'imagePath': imagePath,
+    };
+  }
+
+  factory Pig.fromJson(Map<String, dynamic> json) {
+    return Pig(
+      tag: json['tag'],
+      name: json['name'],
+      breed: json['breed'],
+      gender: json['gender'],
+      stage: json['stage'],
+      weight: json['weight'],
+      source: json['source'],
+      dob: json['dob'],
+      doe: json['doe'],
+      motherTag: json['motherTag'],
+      fatherTag: json['fatherTag'],
+      pigpenKey: json['pigpenKey'],
+      notes: json['notes'],
+      imagePath: json['imagePath'],
+    );
+  }
 }
