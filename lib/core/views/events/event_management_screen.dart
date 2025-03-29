@@ -65,7 +65,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   List<PigEvent> get _filteredEvents {
-    var filtered = _allEvents.where((event) {
+    return _allEvents.where((event) {
       final matchesSearch =
           event.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
               (event.description
@@ -75,10 +75,14 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       final matchesType =
           _filterType == 'All' || event.eventType == _filterType;
       return matchesSearch && matchesType;
-    }).toList();
-
-    filtered.sort((a, b) => b.date.compareTo(a.date));
-    return filtered;
+    }).toList()
+      ..sort((a, b) {
+        // Sort by completion status (incomplete first), then by date
+        if (a.isCompleted != b.isCompleted) {
+          return a.isCompleted ? 1 : -1;
+        }
+        return b.date.compareTo(a.date);
+      });
   }
 
   @override
@@ -195,9 +199,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                   Expanded(
                     child: Text(
                       event.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
+                        color: event.isCompleted ? Colors.green[700] : null,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -212,18 +217,33 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
               Row(
                 children: [
                   Icon(
-                    Icons.calendar_today,
+                    event.isCompleted
+                        ? Icons.check_circle
+                        : Icons.calendar_today,
                     size: 16,
-                    color: Colors.grey[600],
+                    color: event.isCompleted ? Colors.green : Colors.grey[600],
                   ),
                   const SizedBox(width: 4),
                   Text(
                     DateFormat('MMM dd, yyyy').format(event.date),
                     style: TextStyle(
-                      color: event.isUpcoming ? Colors.green[700] : Colors.grey,
+                      color: event.isCompleted
+                          ? Colors.green[700]
+                          : event.date.isAfter(DateTime.now())
+                              ? Colors.green[700]
+                              : Colors.grey,
                     ),
                   ),
-                  if (event.isUpcoming) ...[
+                  if (event.isCompleted) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '• Completed',
+                      style: TextStyle(
+                        color: Colors.green[700],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ] else if (event.date.isAfter(DateTime.now())) ...[
                     const Spacer(),
                     Chip(
                       label: const Text("Upcoming"),
@@ -233,6 +253,16 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                   ],
                 ],
               ),
+              if (event.isCompleted && event.completedDate != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'Completed on: ${DateFormat('MMM dd, yyyy').format(event.completedDate!)}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
               if (event.description != null &&
                   event.description!.isNotEmpty) ...[
                 const SizedBox(height: 12),
@@ -247,7 +277,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                 "Pigs: ${event.pigTags.length}",
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
-              if (event.isUpcoming) ...[
+              if (!event.isCompleted) ...[
                 const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
@@ -291,18 +321,14 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       ),
     );
 
-    if (confirmed == true && mounted) {
+    if (confirmed == true) {
       try {
-        final updatedEvent = PigEvent(
-          id: event.id,
-          name: event.name,
-          date: DateTime.now(),
-          description: event.description,
-          pigTags: event.pigTags,
-          eventType: event.eventType,
+        final completedEvent = event.copyWith(
+          isCompleted: true,
+          completedDate: DateTime.now(),
         );
 
-        await _eventsBox.put(event.id, updatedEvent);
+        await _eventsBox.put(event.id, completedEvent);
         await _loadEvents();
 
         if (mounted) {

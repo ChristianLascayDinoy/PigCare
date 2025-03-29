@@ -124,19 +124,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     },
                   ),
                   DashboardCard(
-                    title: "Events",
-                    icon: Icons.event,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
+                      title: "Events",
+                      icon: Icons.event,
+                      onTap: () {
+                        final pigpenBox = Hive.box<Pigpen>('pigpens');
+                        final allPigs = pigpenBox.values
+                            .expand((pigpen) => pigpen.pigs)
+                            .toList();
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
                             builder: (context) => EventManagementScreen(
-                                  allPigs: [],
-                                  initialSelectedPigs: [],
-                                )),
-                      );
-                    },
-                  ),
+                              allPigs: allPigs,
+                              initialSelectedPigs: [], // Empty if no specific pigs pre-selected
+                            ),
+                          ),
+                        );
+                      }),
                   DashboardCard(
                     title: "Expenses",
                     icon: Icons.attach_money,

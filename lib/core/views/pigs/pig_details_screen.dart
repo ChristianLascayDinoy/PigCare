@@ -58,8 +58,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   }
 
   Future<void> _loadPigEvents() async {
-    if (_isLoadingEvents) return;
-
     setState(() => _isLoadingEvents = true);
 
     try {
@@ -68,9 +66,14 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
           .toList();
 
       setState(() {
-        _upcomingEvents = allEvents.where((e) => e.isUpcoming).toList()
+        _upcomingEvents = allEvents
+            .where((e) => !e.isCompleted) // Only incomplete events
+            .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
-        _pastEvents = allEvents.where((e) => e.isPast).toList()
+
+        _pastEvents = allEvents
+            .where((e) => e.isCompleted) // Only completed events
+            .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
       });
     } catch (e) {
@@ -80,9 +83,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         );
       }
     } finally {
-      if (mounted) {
-        setState(() => _isLoadingEvents = false);
-      }
+      setState(() => _isLoadingEvents = false);
     }
   }
 
@@ -487,8 +488,8 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
       context,
       MaterialPageRoute(
         builder: (context) => EventManagementScreen(
-          allPigs: [_currentPig],
-          initialSelectedPigs: [_currentPig.tag],
+          allPigs: widget.allPigs, // Pass all pigs instead of just current pig
+          initialSelectedPigs: [_currentPig.tag], // But pre-select current pig
         ),
       ),
     );
