@@ -9,6 +9,7 @@ class PigEvent {
 
   bool get isUpcoming => !isCompleted && date.isAfter(DateTime.now());
   bool get isPast => isCompleted || date.isBefore(DateTime.now());
+  bool get canEdit => !isCompleted;
 
   @HiveField(0)
   final String id;

@@ -264,42 +264,23 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   }
 
   Widget _buildEventsTab() {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.add),
-            label: const Text("Add New Event"),
-            onPressed: _addNewEvent,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green[700],
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-            ),
-          ),
-        ),
-        Expanded(
-          child: _isLoadingEvents
-              ? _buildLoadingIndicator()
-              : _upcomingEvents.isEmpty
-                  ? _buildEmptyState(
-                      "No upcoming events\nAdd your first event!",
-                      Icons.event,
-                    )
-                  : RefreshIndicator(
-                      onRefresh: _loadPigEvents,
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _upcomingEvents.length,
-                        itemBuilder: (context, index) {
-                          return _buildEventCard(_upcomingEvents[index]);
-                        },
-                      ),
-                    ),
-        ),
-      ],
-    );
+    return _isLoadingEvents
+        ? _buildLoadingIndicator()
+        : _upcomingEvents.isEmpty
+            ? _buildEmptyState(
+                "No upcoming events",
+                Icons.event,
+              )
+            : RefreshIndicator(
+                onRefresh: _loadPigEvents,
+                child: ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: _upcomingEvents.length,
+                  itemBuilder: (context, index) {
+                    return _buildEventCard(_upcomingEvents[index]);
+                  },
+                ),
+              );
   }
 
   Widget _buildHistoryTab() {
@@ -386,24 +367,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                 event.description,
                 style: const TextStyle(fontSize: 14),
               ),
-              if (event.isUpcoming) ...[
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => _markEventAsComplete(event),
-                      child: const Text("Mark Complete"),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _editEvent(event),
-                      tooltip: 'Edit event',
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),
@@ -480,24 +443,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     return const Center(
       child: CircularProgressIndicator(),
     );
-  }
-
-  // ==================== Event Methods ====================
-  Future<void> _addNewEvent() async {
-    final newEvent = await Navigator.push<PigEvent>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EventManagementScreen(
-          allPigs: widget.allPigs, // Pass all pigs instead of just current pig
-          initialSelectedPigs: [_currentPig.tag], // But pre-select current pig
-        ),
-      ),
-    );
-
-    if (newEvent != null && mounted) {
-      await _loadPigEvents();
-      widget.onPigUpdated(_currentPig);
-    }
   }
 
   Future<void> _editEvent(PigEvent event) async {

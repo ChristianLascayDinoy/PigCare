@@ -77,7 +77,6 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       return matchesSearch && matchesType;
     }).toList()
       ..sort((a, b) {
-        // Sort by completion status (incomplete first), then by date
         if (a.isCompleted != b.isCompleted) {
           return a.isCompleted ? 1 : -1;
         }
@@ -307,7 +306,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Completion"),
-        content: const Text("Mark this event as completed?"),
+        content: const Text(
+            "This will lock the event from further edits. Continue?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -315,7 +315,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Confirm"),
+            child: const Text("Complete"),
           ),
         ],
       ),
@@ -327,10 +327,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           isCompleted: true,
           completedDate: DateTime.now(),
         );
-
         await _eventsBox.put(event.id, completedEvent);
         await _loadEvents();
-
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Event marked as complete')),
@@ -353,6 +351,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           allPigs: widget.allPigs,
           existingEvent: null,
           initialSelectedPigs: widget.initialSelectedPigs,
+          eventsBox: _eventsBox,
         ),
         fullscreenDialog: true,
       ),
@@ -364,19 +363,63 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 
   Future<void> _showEventDetails(BuildContext context, PigEvent event) async {
-    final result = await Navigator.of(context).push<PigEvent>(
-      MaterialPageRoute(
-        builder: (context) => AddEditEventDialog(
-          allPigs: widget.allPigs,
-          existingEvent: event,
-          initialSelectedPigs: event.pigTags,
+    if (event.isCompleted) {
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(event.name),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Type: ${event.eventType}'),
+                Text('Date: ${DateFormat.yMMMd().format(event.date)}'),
+                if (event.completedDate != null)
+                  Text(
+                      'Completed: ${DateFormat.yMMMd().format(event.completedDate!)}'),
+                const SizedBox(height: 16),
+                const Text('Pigs in this event:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                Column(
+                  children: event.pigTags.map((tag) => Text(tag)).toList(),
+                ),
+                const SizedBox(height: 16),
+                Text(event.description),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Close"),
+            ),
+          ],
         ),
-        fullscreenDialog: true,
-      ),
-    );
+      );
+    } else {
+      final result = await Navigator.of(context).push<dynamic>(
+        // Change to dynamic
+        MaterialPageRoute(
+          builder: (context) => AddEditEventDialog(
+            allPigs: widget.allPigs,
+            existingEvent: event,
+            initialSelectedPigs: event.pigTags,
+            eventsBox: _eventsBox,
+          ),
+        ),
+      );
 
-    if (result != null && mounted) {
-      await _saveEvent(result);
+      if (mounted) {
+        if (result is bool) {
+          // Handle deletion case
+          if (result) {
+            await _loadEvents();
+          }
+        } else if (result is PigEvent) {
+          // Handle save/edit case
+          await _saveEvent(result);
+        }
+      }
     }
   }
 
@@ -418,12 +461,14 @@ class AddEditEventDialog extends StatefulWidget {
   final List<Pig> allPigs;
   final PigEvent? existingEvent;
   final List<String> initialSelectedPigs;
+  final Box<PigEvent> eventsBox;
 
   const AddEditEventDialog({
     super.key,
     required this.allPigs,
     this.existingEvent,
     required this.initialSelectedPigs,
+    required this.eventsBox,
   });
 
   @override
@@ -474,7 +519,7 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
           if (widget.existingEvent != null)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _confirmDelete,
+              onPressed: _confirmDeleteEvent,
             ),
         ],
       ),
@@ -629,6 +674,7 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
     }
   }
 
+  // In the _saveEvent method:
   Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedPigTags.isEmpty) {
@@ -648,17 +694,22 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
           : '',
       pigTags: _selectedPigTags,
       eventType: _selectedEventType,
+      isCompleted: widget.existingEvent?.isCompleted ?? false,
+      completedDate: widget.existingEvent?.completedDate,
     );
 
-    Navigator.pop(context, event);
+    Navigator.pop(context, event); // Return the event for saving
   }
 
-  Future<void> _confirmDelete() async {
+// In the _confirmDeleteEvent method:
+  Future<void> _confirmDeleteEvent() async {
+    if (widget.existingEvent == null) return;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Delete"),
-        content: const Text("Are you sure you want to delete this event?"),
+        content: Text("Delete ${widget.existingEvent!.name} event?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -672,8 +723,20 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       ),
     );
 
-    if (confirmed == true && mounted) {
-      Navigator.pop(context, null);
+    if (confirmed == true) {
+      try {
+        await widget.eventsBox.delete(widget.existingEvent!.id);
+        if (mounted) {
+          Navigator.pop(context, true); // Return true for deletion
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting event: $e')),
+          );
+          Navigator.pop(context, false); // Return false for failed deletion
+        }
+      }
     }
   }
 }
