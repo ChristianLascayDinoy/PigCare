@@ -17,8 +17,8 @@ class PigManagementScreen extends StatefulWidget {
     required this.pigpenIndex,
     this.existingPig,
     this.pigpens,
+    required List allPigs,
     required Pig pig,
-    required List<Pig> allPigs,
   });
 
   @override
@@ -595,24 +595,34 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
   }
 
   Widget _buildTagField() {
-    final existingTags = widget.allPigs.map((pig) => pig.tag).toList();
-    if (widget.existingPig != null) {
-      existingTags.remove(widget.existingPig!.tag);
-    }
-
-    return TextFormField(
-      controller: _controllers['tag'],
-      decoration: const InputDecoration(
-        labelText: "Tag Number *",
-        border: OutlineInputBorder(),
-      ),
-      validator: (value) {
-        if (value == null || value.isEmpty) return 'Required field';
-        if (existingTags.contains(value)) {
-          return 'Tag number must be unique';
-        }
-        return null;
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextFormField(
+          controller: _controllers['tag'],
+          decoration: const InputDecoration(
+            labelText: "Tag Number *",
+            border: OutlineInputBorder(),
+          ),
+          readOnly: widget.existingPig != null,
+          validator: (value) {
+            if (value == null || value.isEmpty) return 'Required field';
+            if (widget.existingPig == null &&
+                widget.allPigs.any((pig) => pig.tag == value)) {
+              return 'Tag number must be unique';
+            }
+            return null;
+          },
+        ),
+        if (widget.existingPig != null)
+          const Padding(
+            padding: EdgeInsets.only(top: 4.0),
+            child: Text(
+              'Tag number is permanent and cannot be changed',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+          ),
+      ],
     );
   }
 

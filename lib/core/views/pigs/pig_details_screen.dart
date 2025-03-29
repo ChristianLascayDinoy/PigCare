@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../models/pig_model.dart';
 import '../../models/pigpen_model.dart';
 import '../../models/event_model.dart';
-import 'pig_management_screen.dart';
 import '../events/event_management_screen.dart';
 import 'dart:io';
 
@@ -36,6 +35,13 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   List<PigEvent> _upcomingEvents = [];
   List<PigEvent> _pastEvents = [];
   bool _isLoadingEvents = false;
+  List<Pig> _getOffspring() {
+    return widget.allPigs
+        .where((pig) =>
+            pig.motherTag == _currentPig.tag ||
+            pig.fatherTag == _currentPig.tag)
+        .toList();
+  }
 
   @override
   void initState() {
@@ -119,11 +125,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         backgroundColor: Colors.green[700],
         iconTheme: const IconThemeData(color: Colors.white),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.edit),
-            onPressed: _editPigDetails,
-            tooltip: 'Edit pig',
-          ),
           IconButton(
             icon: const Icon(Icons.more_vert),
             onPressed: () => _showOptionsMenu(context),
@@ -246,19 +247,24 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         _buildDetailRow(
           "Mother's Tag",
           _currentPig.motherTag ?? "-",
-          isClickable: _currentPig.motherTag != null,
-          onTap: () => _navigateToParent(_currentPig.motherTag),
+          showSearchIcon: _currentPig.motherTag != null,
+          onSearchTap: _currentPig.motherTag != null
+              ? () => _navigateToParent(_currentPig.motherTag)
+              : null,
         ),
         _buildDetailRow(
           "Father's Tag",
           _currentPig.fatherTag ?? "-",
-          isClickable: _currentPig.fatherTag != null,
-          onTap: () => _navigateToParent(_currentPig.fatherTag),
+          showSearchIcon: _currentPig.fatherTag != null,
+          onSearchTap: _currentPig.fatherTag != null
+              ? () => _navigateToParent(_currentPig.fatherTag)
+              : null,
         ),
         _buildDetailRow(
           "Notes",
           (_currentPig.notes ?? "").isNotEmpty ? _currentPig.notes! : "-",
         ),
+        _buildOffspringSection(),
       ],
     );
   }
@@ -374,11 +380,99 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
   }
 
+  Widget _buildOffspringSection() {
+    final offspring = _getOffspring();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        Text(
+          "Pig's Offspring",
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 16,
+            color: Colors.green[700],
+          ),
+        ),
+        const SizedBox(height: 8),
+        offspring.isEmpty
+            ? _buildNoOffspringMessage()
+            : Column(
+                children:
+                    offspring.map((pig) => _buildOffspringItem(pig)).toList(),
+              ),
+      ],
+    );
+  }
+
+  Widget _buildNoOffspringMessage() {
+    return Card(
+      color: Colors.grey[100],
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "No offspring linked yet!",
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey[800],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "To link one, go and edit the offspring's record, "
+              "enter this pig's tag number in the 'Father's tag no' or "
+              "'Mother's tag no' field, and save.",
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.grey[600],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOffspringItem(Pig pig) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: Colors.grey[200],
+          child: Text(pig.tag[0]), // First letter of tag
+        ),
+        title: Text(pig.name ?? "Tag: ${pig.tag}"),
+        subtitle: Text("${pig.breed} • ${pig.getFormattedAge()}"),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: () => _navigateToPig(pig),
+      ),
+    );
+  }
+
+  void _navigateToPig(Pig pig) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PigDetailsScreen(
+          pig: pig,
+          pigpens: widget.pigpens,
+          allPigs: widget.allPigs,
+          onPigUpdated: widget.onPigUpdated,
+          onPigDeleted: widget.onPigDeleted,
+        ),
+      ),
+    );
+  }
+
   Widget _buildDetailRow(
     String label,
     String value, {
-    bool isClickable = false,
-    VoidCallback? onTap,
+    bool showSearchIcon = false,
+    VoidCallback? onSearchTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -397,22 +491,21 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
             ),
           ),
           Expanded(
-            child: isClickable
-                ? GestureDetector(
-                    onTap: onTap,
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.blue,
-                        decoration: TextDecoration.underline,
-                      ),
-                    ),
-                  )
-                : Text(
-                    value,
-                    style: const TextStyle(fontSize: 16),
+            child: Row(
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                if (showSearchIcon && onSearchTap != null)
+                  IconButton(
+                    icon: const Icon(Icons.search, size: 18),
+                    onPressed: onSearchTap,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
                   ),
+              ],
+            ),
           ),
         ],
       ),
@@ -510,73 +603,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     }
   }
 
-  Future<void> _markEventAsComplete(PigEvent event) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Completion"),
-        content: const Text("Mark this event as completed?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Confirm"),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true && mounted) {
-      try {
-        final completedEvent = PigEvent(
-          id: event.id,
-          name: event.name,
-          date: DateTime.now(), // Set to current time when completed
-          description: event.description,
-          pigTags: event.pigTags,
-          eventType: event.eventType,
-        );
-
-        await _eventsBox.put(event.id, completedEvent);
-        await _loadPigEvents();
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event marked as complete')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: ${e.toString()}')),
-          );
-        }
-      }
-    }
-  }
-
   // ==================== Pig Methods ====================
-  Future<void> _editPigDetails() async {
-    final updatedPig = await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PigManagementScreen(
-          pig: _currentPig,
-          pigpens: widget.pigpens,
-          allPigs: widget.allPigs,
-          pigpenIndex: 0,
-        ),
-      ),
-    );
-
-    if (updatedPig != null && mounted) {
-      setState(() => _currentPig = updatedPig);
-      widget.onPigUpdated(updatedPig);
-    }
-  }
 
   void _navigateToParent(String? tag) {
     if (tag == null || !mounted) return;

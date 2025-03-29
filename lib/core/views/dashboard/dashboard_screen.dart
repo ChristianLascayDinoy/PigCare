@@ -3,7 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
 import '../pigs/pigpen_management_screen.dart';
-import '../feeds/feeds_screen.dart';
+import '../feeds/feeds_management_screen.dart';
 import '../events/event_management_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../sales/sales_screen.dart';

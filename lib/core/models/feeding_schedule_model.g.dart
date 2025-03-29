@@ -22,6 +22,7 @@ class FeedingScheduleAdapter extends TypeAdapter<FeedingSchedule> {
       feedType: fields[2] as String,
       quantity: fields[3] as double,
       time: fields[4] as String,
+      date: DateTime(0),
     );
   }
 

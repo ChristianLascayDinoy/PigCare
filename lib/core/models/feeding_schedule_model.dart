@@ -25,5 +25,7 @@ class FeedingSchedule extends HiveObject {
     required this.feedType,
     required this.quantity,
     required this.time,
+    String? pigName,
+    required DateTime date,
   });
 }
