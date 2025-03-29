@@ -64,6 +64,30 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
+  Future<void> _deleteEvent(PigEvent event) async {
+    try {
+      await _eventsBox.delete(event.id);
+      await _loadEvents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Event successfully deleted'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting event: $e'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
   List<PigEvent> get _filteredEvents {
     return _allEvents.where((event) {
       final matchesSearch =
@@ -276,11 +300,11 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                 "Pigs: ${event.pigTags.length}",
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
-              if (!event.isCompleted) ...[
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  if (!event.isCompleted) ...[
                     TextButton(
                       onPressed: () => _markEventAsComplete(event),
                       child: const Text("Mark Complete"),
@@ -292,8 +316,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                       tooltip: 'Edit event',
                     ),
                   ],
-                ),
-              ],
+                ],
+              ),
             ],
           ),
         ),
@@ -364,7 +388,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
 
   Future<void> _showEventDetails(BuildContext context, PigEvent event) async {
     if (event.isCompleted) {
-      await showDialog(
+      // Read-only view for completed events with delete option
+      final shouldDelete = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(event.name),
@@ -390,15 +415,45 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context, false),
               child: const Text("Close"),
+            ),
+            TextButton(
+              onPressed: () async {
+                // Show confirmation before actual deletion
+                final confirmed = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text("Confirm Delete"),
+                    content: Text("Delete ${event.name} event?"),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text("Cancel"),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text("Delete",
+                            style: TextStyle(color: Colors.red)),
+                      ),
+                    ],
+                  ),
+                );
+
+                // Close both dialogs and return the confirmation result
+                Navigator.pop(context, confirmed ?? false);
+              },
+              child: const Text("Delete", style: TextStyle(color: Colors.red)),
             ),
           ],
         ),
       );
+
+      if (shouldDelete == true && mounted) {
+        await _deleteEvent(event);
+      }
     } else {
       final result = await Navigator.of(context).push<dynamic>(
-        // Change to dynamic
         MaterialPageRoute(
           builder: (context) => AddEditEventDialog(
             allPigs: widget.allPigs,
@@ -411,12 +466,10 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
 
       if (mounted) {
         if (result is bool) {
-          // Handle deletion case
           if (result) {
             await _loadEvents();
           }
         } else if (result is PigEvent) {
-          // Handle save/edit case
           await _saveEvent(result);
         }
       }
@@ -674,7 +727,6 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
     }
   }
 
-  // In the _saveEvent method:
   Future<void> _saveEvent() async {
     if (!_formKey.currentState!.validate()) return;
     if (_selectedPigTags.isEmpty) {
@@ -698,10 +750,9 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       completedDate: widget.existingEvent?.completedDate,
     );
 
-    Navigator.pop(context, event); // Return the event for saving
+    Navigator.pop(context, event);
   }
 
-// In the _confirmDeleteEvent method:
   Future<void> _confirmDeleteEvent() async {
     if (widget.existingEvent == null) return;
 
@@ -727,14 +778,23 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       try {
         await widget.eventsBox.delete(widget.existingEvent!.id);
         if (mounted) {
-          Navigator.pop(context, true); // Return true for deletion
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Event successfully deleted'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+          Navigator.pop(context, true);
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting event: $e')),
+            SnackBar(
+              content: Text('Error deleting event: $e'),
+              duration: Duration(seconds: 2),
+            ),
           );
-          Navigator.pop(context, false); // Return false for failed deletion
+          Navigator.pop(context, false);
         }
       }
     }
