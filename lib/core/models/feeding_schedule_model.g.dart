@@ -18,28 +18,33 @@ class FeedingScheduleAdapter extends TypeAdapter<FeedingSchedule> {
     };
     return FeedingSchedule(
       pigId: fields[0] as String,
-      pigpenId: fields[1] as String,
-      feedType: fields[2] as String,
-      quantity: fields[3] as double,
-      time: fields[4] as String,
-      date: DateTime(0),
+      pigName: fields[1] as String,
+      pigpenId: fields[2] as String,
+      feedType: fields[3] as String,
+      quantity: fields[4] as double,
+      time: fields[5] as String,
+      date: fields[6] as DateTime,
     );
   }
 
   @override
   void write(BinaryWriter writer, FeedingSchedule obj) {
     writer
-      ..writeByte(5)
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.pigId)
       ..writeByte(1)
-      ..write(obj.pigpenId)
+      ..write(obj.pigName)
       ..writeByte(2)
-      ..write(obj.feedType)
+      ..write(obj.pigpenId)
       ..writeByte(3)
-      ..write(obj.quantity)
+      ..write(obj.feedType)
       ..writeByte(4)
-      ..write(obj.time);
+      ..write(obj.quantity)
+      ..writeByte(5)
+      ..write(obj.time)
+      ..writeByte(6)
+      ..write(obj.date);
   }
 
   @override

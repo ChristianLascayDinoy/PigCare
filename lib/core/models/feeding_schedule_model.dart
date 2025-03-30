@@ -3,29 +3,42 @@ import 'package:hive/hive.dart';
 part 'feeding_schedule_model.g.dart';
 
 @HiveType(typeId: 3)
-class FeedingSchedule extends HiveObject {
+class FeedingSchedule {
   @HiveField(0)
-  String pigId;
+  final String pigId;
 
   @HiveField(1)
-  String pigpenId;
+  final String pigName;
 
   @HiveField(2)
-  String feedType;
+  final String pigpenId;
 
   @HiveField(3)
-  double quantity;
+  final String feedType;
 
   @HiveField(4)
-  String time;
+  final double quantity;
+
+  @HiveField(5)
+  final String time;
+
+  @HiveField(6)
+  final DateTime date;
 
   FeedingSchedule({
     required this.pigId,
+    required this.pigName,
     required this.pigpenId,
     required this.feedType,
     required this.quantity,
     required this.time,
-    String? pigName,
-    required DateTime date,
+    required this.date,
   });
+
+  // Add this method for deletion
+  Future<void> delete() async {
+    final box = Hive.box<FeedingSchedule>('feedingSchedules');
+    final key = box.keyAt(box.values.toList().indexOf(this));
+    await box.delete(key);
+  }
 }

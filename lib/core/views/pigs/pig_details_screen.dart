@@ -586,14 +586,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
             onPressed: () => Navigator.pop(context),
             child: const Text("Close"),
           ),
-          if (event.isUpcoming)
-            TextButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _editEvent(event);
-              },
-              child: const Text("Edit"),
-            ),
         ],
       ),
     );

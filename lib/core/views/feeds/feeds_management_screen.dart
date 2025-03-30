@@ -122,7 +122,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                 TextFormField(
                   controller: priceController,
                   decoration: const InputDecoration(
-                    labelText: "Price per kg (₱) *",
+                    labelText: "Price (₱) *",
                     border: OutlineInputBorder(),
                     prefixText: '₱',
                   ),

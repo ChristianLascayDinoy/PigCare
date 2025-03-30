@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hive/hive.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:intl/intl.dart';
 import '../../models/pigpen_model.dart';
 import '../../models/pig_model.dart';
 import '../../models/feeding_schedule_model.dart';
@@ -19,6 +20,7 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
   late Box<Feed> feedBox;
   late Box<Pig> pigBox;
   late Box<FeedingSchedule> feedingScheduleBox;
+  List<Pig> selectedPigs = [];
 
   List<Pigpen> pigpens = [];
   List<Feed> feeds = [];
@@ -68,13 +70,10 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
   void _updatePigsList(Pigpen? pigpen) {
     setState(() {
       selectedPigpen = pigpen;
-      selectedPig = null;
+      selectedPigs.clear(); // Clear selection when changing pigpen
 
       if (pigpen != null) {
-        // Get all pigs where pigpenKey matches the selected pigpen's key
-        pigsInSelectedPen =
-            pigBox.values.where((pig) => pig.pigpenKey == pigpen.key).toList();
-
+        pigsInSelectedPen = pigpen.pigs.toList();
         debugPrint('Found ${pigsInSelectedPen.length} pigs in ${pigpen.name}');
       } else {
         pigsInSelectedPen = [];
@@ -96,7 +95,7 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
     if (selectedPigpen == null ||
         selectedFeed == null ||
         quantityController.text.isEmpty ||
-        (!assignToAll && selectedPig == null)) {
+        (!assignToAll && selectedPigs.isEmpty)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Please fill in all required fields.")),
       );
@@ -111,8 +110,7 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
       return;
     }
 
-    final List<Pig> pigsToFeed =
-        assignToAll ? pigsInSelectedPen : [selectedPig!];
+    final List<Pig> pigsToFeed = assignToAll ? pigsInSelectedPen : selectedPigs;
     final double totalRequired = pigsToFeed.length * quantity;
 
     if (selectedFeed!.remainingQuantity < totalRequired) {
@@ -126,30 +124,86 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
     }
 
     try {
-      // Save feeding schedules
       for (final pig in pigsToFeed) {
+        // Ensure non-null values for all required fields
+        final pigName = pig.name ?? 'Unnamed Pig'; // Provide default if null
+        final pigTag = pig.tag; // Assuming tag is non-nullable
+        final penName = selectedPigpen!.name;
+        final feedName = selectedFeed!.name;
+        final timeString = selectedTime.format(context);
+
         await feedingScheduleBox.add(FeedingSchedule(
-          pigId: pig.tag,
-          pigName: pig.name,
-          pigpenId: selectedPigpen!.name,
-          feedType: selectedFeed!.name,
+          pigId: pigTag,
+          pigName: pigName,
+          pigpenId: penName,
+          feedType: feedName,
           quantity: quantity,
-          time: selectedTime.format(context),
+          time: timeString,
           date: DateTime.now(),
         ));
       }
 
-      // Deduct feed from inventory
       selectedFeed!.deductFeed(totalRequired);
       await feedBox.put(selectedFeed!.key, selectedFeed!);
 
+      // Clear form after successful save
+      setState(() {
+        quantityController.clear();
+        selectedPigs.clear();
+      });
+
       if (!mounted) return;
-      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Schedule saved successfully!')),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error saving schedule: ${e.toString()}')),
       );
+    }
+  }
+
+  Future<void> _deleteSchedule(FeedingSchedule schedule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Delete Schedule?"),
+        content:
+            const Text("This will permanently remove this feeding schedule."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        // Find the key for this schedule
+        final key = feedingScheduleBox.keyAt(
+          feedingScheduleBox.values.toList().indexOf(schedule),
+        );
+        await feedingScheduleBox.delete(key);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Schedule deleted successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting schedule: ${e.toString()}')),
+          );
+        }
+      }
     }
   }
 
@@ -163,172 +217,308 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Add Feeding Schedule"),
+        title: const Text("Feeding Schedules"),
         backgroundColor: Colors.green[700],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Pig Pen Selection
-            DropdownButtonFormField<Pigpen>(
-              decoration: const InputDecoration(
-                labelText: "Select Pig Pen*",
-                border: OutlineInputBorder(),
-              ),
-              value: selectedPigpen,
-              items: pigpens.map((pen) {
-                // Count pigs in this pen
-                final pigCount = pigBox.values
-                    .where((pig) => pig.pigpenKey == pen.key)
-                    .length;
-
-                return DropdownMenuItem(
-                  value: pen,
-                  child: Text("${pen.name} ($pigCount pigs)"),
-                );
-              }).toList(),
-              onChanged: (pen) => _updatePigsList(pen),
-              validator: (value) => value == null ? "Required field" : null,
-            ),
-
-            const SizedBox(height: 16),
-
-            // Pig Selection (only shown if pigpen selected)
-            if (selectedPigpen != null) ...[
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // Form Section
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    "Pigs in ${selectedPigpen!.name}: ${pigsInSelectedPen.length}",
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  if (pigsInSelectedPen.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Text(
-                        "No pigs found in this pen",
-                        style: TextStyle(color: Colors.red),
-                      ),
+                  Card(
+                    elevation: 2,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
                     ),
-                  if (pigsInSelectedPen.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    // Apply to all toggle
-                    CheckboxListTile(
-                      title: const Text("Apply to all pigs in this pen"),
-                      value: assignToAll,
-                      onChanged: (value) => setState(() {
-                        assignToAll = value!;
-                        if (assignToAll) selectedPig = null;
-                      }),
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Create New Schedule",
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
 
-                    // Individual pig selection (only if not applying to all)
-                    if (!assignToAll) ...[
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<Pig>(
-                        decoration: const InputDecoration(
-                          labelText: "Select Pig*",
-                          border: OutlineInputBorder(),
-                        ),
-                        value: selectedPig,
-                        items: pigsInSelectedPen
-                            .map((pig) => DropdownMenuItem(
-                                  value: pig,
-                                  child: Text("${pig.name} (${pig.tag})"),
-                                ))
-                            .toList(),
-                        onChanged: (pig) => setState(() => selectedPig = pig),
-                        validator: (value) =>
-                            value == null ? "Required field" : null,
+                          // Pig Pen Selection
+                          DropdownButtonFormField<Pigpen>(
+                            decoration: const InputDecoration(
+                              labelText: "Select Pig Pen*",
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            value: selectedPigpen,
+                            items: pigpens.map((pen) {
+                              return DropdownMenuItem(
+                                value: pen,
+                                child: Text(
+                                    "${pen.name} (${pen.pigs.length} pigs)"),
+                              );
+                            }).toList(),
+                            onChanged: (pen) => _updatePigsList(pen),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Pig Selection
+                          if (selectedPigpen != null) ...[
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  "Pigs in ${selectedPigpen!.name}: ${pigsInSelectedPen.length}",
+                                  style: const TextStyle(fontSize: 16),
+                                ),
+                                if (pigsInSelectedPen.isEmpty)
+                                  const Padding(
+                                    padding: EdgeInsets.only(top: 8),
+                                    child: Text(
+                                      "No pigs found in this pen",
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ),
+                                if (pigsInSelectedPen.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  CheckboxListTile(
+                                    title: const Text(
+                                        "Apply to all pigs in this pen"),
+                                    value: assignToAll,
+                                    onChanged: (value) => setState(() {
+                                      assignToAll = value!;
+                                      if (assignToAll) selectedPigs.clear();
+                                    }),
+                                    controlAffinity:
+                                        ListTileControlAffinity.leading,
+                                  ),
+                                  if (!assignToAll) ...[
+                                    const SizedBox(height: 8),
+                                    const Text("Select Pigs:",
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold)),
+                                    const SizedBox(height: 8),
+                                    Container(
+                                      height: 150,
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                            color: Colors.grey.shade300),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: ListView.builder(
+                                        itemCount: pigsInSelectedPen.length,
+                                        itemBuilder: (context, index) {
+                                          final pig = pigsInSelectedPen[index];
+                                          return CheckboxListTile(
+                                            title: Text(
+                                                "${pig.name ?? 'Unnamed'} (${pig.tag})"),
+                                            value: selectedPigs.contains(pig),
+                                            onChanged: (bool? value) {
+                                              setState(() {
+                                                if (value == true) {
+                                                  selectedPigs.add(pig);
+                                                } else {
+                                                  selectedPigs.remove(pig);
+                                                }
+                                              });
+                                            },
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ],
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Feed Selection
+                          DropdownButtonFormField<Feed>(
+                            decoration: const InputDecoration(
+                              labelText: "Select Feed Type*",
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            value: selectedFeed,
+                            items: feeds
+                                .map((feed) => DropdownMenuItem(
+                                      value: feed,
+                                      child: Text(
+                                        "${feed.name} (${feed.remainingQuantity.toStringAsFixed(2)} kg)",
+                                        style: TextStyle(
+                                          color: feed.remainingQuantity < 5
+                                              ? Colors.red
+                                              : null,
+                                        ),
+                                      ),
+                                    ))
+                                .toList(),
+                            onChanged: (feed) =>
+                                setState(() => selectedFeed = feed),
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Quantity Input
+                          TextFormField(
+                            controller: quantityController,
+                            decoration: const InputDecoration(
+                              labelText: "Quantity per pig (kg)*",
+                              border: OutlineInputBorder(),
+                              filled: true,
+                              fillColor: Colors.white,
+                            ),
+                            keyboardType:
+                                TextInputType.numberWithOptions(decimal: true),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                  RegExp(r'^\d*\.?\d{0,2}')),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Time Selection
+                          InkWell(
+                            onTap: _pickTime,
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade400),
+                                borderRadius: BorderRadius.circular(4),
+                                color: Colors.white,
+                              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  const Text(
+                                    "Feeding Time*",
+                                    style: TextStyle(fontSize: 16),
+                                  ),
+                                  Text(
+                                    selectedTime.format(context),
+                                    style: const TextStyle(fontSize: 16),
+                                  ),
+                                  const Icon(Icons.access_time),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+
+                          // Save Button
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _saveFeedingSchedule,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green[700],
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text(
+                                "SAVE SCHEDULE",
+                                style: TextStyle(fontSize: 16),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ],
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
-            ],
-
-            // Feed Selection
-            DropdownButtonFormField<Feed>(
-              decoration: const InputDecoration(
-                labelText: "Select Feed Type*",
-                border: OutlineInputBorder(),
-              ),
-              value: selectedFeed,
-              items: feeds
-                  .map((feed) => DropdownMenuItem(
-                        value: feed,
-                        child: Text(
-                          "${feed.name} (${feed.remainingQuantity.toStringAsFixed(2)} kg)",
-                          style: TextStyle(
-                            color:
-                                feed.remainingQuantity < 5 ? Colors.red : null,
-                          ),
-                        ),
-                      ))
-                  .toList(),
-              onChanged: (feed) => setState(() => selectedFeed = feed),
-              validator: (value) => value == null ? "Required field" : null,
             ),
 
-            const SizedBox(height: 16),
-
-            // Quantity Input
-            TextFormField(
-              controller: quantityController,
-              decoration: const InputDecoration(
-                labelText: "Quantity per pig (kg)*",
-                border: OutlineInputBorder(),
+            // Schedule List Section
+            const Divider(height: 1, thickness: 1),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              color: Colors.grey[100],
+              child: const Row(
+                children: [
+                  Icon(Icons.history, color: Colors.green),
+                  SizedBox(width: 8),
+                  Text(
+                    "Existing Schedules",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ],
               ),
-              keyboardType: TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
-              ],
-              validator: (value) {
-                if (value == null || value.isEmpty) return "Required field";
-                final num = double.tryParse(value);
-                if (num == null || num <= 0) return "Enter valid quantity";
-                return null;
-              },
             ),
-
-            const SizedBox(height: 16),
-
-            // Time Selection
-            ListTile(
-              title: const Text("Feeding Time*"),
-              subtitle: Text(
-                selectedTime.format(context),
-                style: const TextStyle(fontSize: 16),
-              ),
-              trailing: const Icon(Icons.access_time),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-                side: BorderSide(color: Colors.grey.shade400),
-              ),
-              onTap: _pickTime,
-            ),
-
-            const SizedBox(height: 24),
-
-            // Save Button
-            ElevatedButton(
-              onPressed: _saveFeedingSchedule,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green[700],
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
-              child: const Text(
-                "SAVE SCHEDULE",
-                style: TextStyle(fontSize: 16),
-              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              height: MediaQuery.of(context).size.height *
+                  0.5, // Adjust height as needed
+              child: _buildScheduleList(),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildScheduleList() {
+    return ValueListenableBuilder(
+      valueListenable: feedingScheduleBox.listenable(),
+      builder: (context, Box<FeedingSchedule> box, _) {
+        final schedules = box.values.toList().cast<FeedingSchedule>();
+
+        if (schedules.isEmpty) {
+          return const Center(
+            child: Text("No feeding schedules found"),
+          );
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.vertical,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: DataTable(
+              columnSpacing: 24,
+              headingRowColor: MaterialStateProperty.resolveWith<Color>(
+                (states) => Colors.green[50]!,
+              ),
+              columns: const [
+                DataColumn(label: Text("Pig ID")),
+                DataColumn(label: Text("Pen")),
+                DataColumn(label: Text("Feed")),
+                DataColumn(label: Text("Qty (kg)"), numeric: true),
+                DataColumn(label: Text("Time")),
+                DataColumn(label: Text("Date")),
+                DataColumn(label: Text("Actions")),
+              ],
+              rows: schedules.map((schedule) {
+                return DataRow(
+                  cells: [
+                    DataCell(Text(schedule.pigId)),
+                    DataCell(Text(schedule.pigpenId)),
+                    DataCell(Text(schedule.feedType)),
+                    DataCell(Text(schedule.quantity.toStringAsFixed(2))),
+                    DataCell(Text(schedule.time)),
+                    DataCell(Text(DateFormat('MMM dd').format(schedule.date))),
+                    DataCell(
+                      IconButton(
+                        icon: const Icon(Icons.delete, size: 20),
+                        color: Colors.red,
+                        onPressed: () => _deleteSchedule(schedule),
+                      ),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ),
+          ),
+        );
+      },
     );
   }
 }
