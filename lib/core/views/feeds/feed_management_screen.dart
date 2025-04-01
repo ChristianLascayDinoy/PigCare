@@ -142,7 +142,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     if (price <= 0) {
                       return 'Must be greater than 0';
                     }
-                    if (price > 1000) {
+                    if (price > 100000) {
                       return 'Price too high';
                     }
                     return null;

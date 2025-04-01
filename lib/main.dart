@@ -7,7 +7,6 @@ import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
 import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/views/dashboard/dashboard_screen.dart';
-import 'package:pigcare/core/views/systemlogin/intro_screen.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 
 void main() async {

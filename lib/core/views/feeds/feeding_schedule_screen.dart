@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:intl/intl.dart';
 import '../../models/pigpen_model.dart';
 import '../../models/pig_model.dart';
 import '../../models/feeding_schedule_model.dart';
@@ -489,22 +488,22 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
               ),
               columns: const [
                 DataColumn(label: Text("Pig ID")),
+                DataColumn(label: Text("Name")),
                 DataColumn(label: Text("Pen")),
                 DataColumn(label: Text("Feed")),
                 DataColumn(label: Text("Qty (kg)"), numeric: true),
                 DataColumn(label: Text("Time")),
-                DataColumn(label: Text("Date")),
                 DataColumn(label: Text("Actions")),
               ],
               rows: schedules.map((schedule) {
                 return DataRow(
                   cells: [
                     DataCell(Text(schedule.pigId)),
+                    DataCell(Text(schedule.pigName)),
                     DataCell(Text(schedule.pigpenId)),
                     DataCell(Text(schedule.feedType)),
                     DataCell(Text(schedule.quantity.toStringAsFixed(2))),
                     DataCell(Text(schedule.time)),
-                    DataCell(Text(DateFormat('MMM dd').format(schedule.date))),
                     DataCell(
                       IconButton(
                         icon: const Icon(Icons.delete, size: 20),
