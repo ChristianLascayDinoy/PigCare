@@ -285,7 +285,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
               onPigDeleted: (pigToDelete) {
                 _deletePig(pigToDelete);
               },
-              allPigs: [],
+              allPigs: _allPigs,
             ),
           ),
         ),
@@ -797,41 +797,97 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
           pig.isSexuallyMature;
     }).toList();
 
-    return DropdownButtonFormField<String>(
-      value: currentValue,
-      decoration: InputDecoration(
-        labelText: label,
-        border: const OutlineInputBorder(),
-      ),
-      items: [
-        const DropdownMenuItem(
-          value: null,
-          child: Text('None'),
-        ),
-        ...availablePigs.map((pig) {
-          return DropdownMenuItem(
-            value: pig.tag,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    // Find the selected pig to display its details
+    final selectedPig = currentValue != null
+        ? availablePigs.firstWhereOrNull((pig) => pig.tag == currentValue)
+        : null;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        GestureDetector(
+          onTap: () => _showParentSelectionDialog(label, requiredGender),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
               children: [
-                Text('${pig.tag} ${pig.genderSymbol}'),
-                Text(
-                  '${pig.name ?? 'No name'} • ${pig.getFormattedAge()}',
-                  style: const TextStyle(fontSize: 12),
+                Expanded(
+                  child: selectedPig == null
+                      ? Text('None selected',
+                          style: TextStyle(color: Colors.grey))
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                                '${selectedPig.tag} ${selectedPig.genderSymbol}'),
+                            if (selectedPig.name != null)
+                              Text(selectedPig.name!),
+                            Text(
+                              '${selectedPig.breed} • ${selectedPig.getFormattedAge()}',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ],
+                        ),
                 ),
+                const Icon(Icons.arrow_drop_down),
               ],
             ),
-          );
-        }),
+          ),
+        ),
       ],
-      onChanged: (value) => setState(() {
-        if (label.contains("Mother")) {
-          _dropdownValues['motherTag'] = value;
-        } else {
-          _dropdownValues['fatherTag'] = value;
-        }
-      }),
     );
+  }
+
+  Future<void> _showParentSelectionDialog(
+      String label, String requiredGender) async {
+    final currentPigTag = widget.existingPig?.tag;
+    final availablePigs = widget.allPigs.where((pig) {
+      return pig.gender == requiredGender &&
+          pig.tag != currentPigTag &&
+          pig.isSexuallyMature;
+    }).toList();
+
+    final selected = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Select $label'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: availablePigs.length,
+            itemBuilder: (context, index) {
+              final pig = availablePigs[index];
+              return ListTile(
+                title: Text('${pig.tag} ${pig.genderSymbol}'),
+                subtitle: Text('${pig.breed} • ${pig.getFormattedAge()}'),
+                onTap: () => Navigator.pop(context, pig.tag),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    setState(() {
+      if (label.contains("Mother")) {
+        _dropdownValues['motherTag'] = selected;
+      } else {
+        _dropdownValues['fatherTag'] = selected;
+      }
+    });
   }
 
   Widget _buildNotesField() {
@@ -883,8 +939,9 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
     );
 
     if (_dropdownValues['motherTag'] != null) {
-      final mother = widget.allPigs
-          .firstWhere((p) => p.tag == _dropdownValues['motherTag']);
+      final mother = widget.allPigs.firstWhere(
+        (p) => p.tag == _dropdownValues['motherTag'],
+      );
       if (!mother.canBeParentOf(newPig)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -896,13 +953,14 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
       }
     }
 
-    if (_dropdownValues['fatherTag'] != null) {
-      final father = widget.allPigs
-          .firstWhere((p) => p.tag == _dropdownValues['fatherTag']);
-      if (!father.canBeParentOf(newPig)) {
+    if (_dropdownValues['motherTag'] != null) {
+      final mother = widget.allPigs.firstWhere(
+        (p) => p.tag == _dropdownValues['motherTag'],
+      );
+      if (!mother.canBeParentOf(newPig)) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Father must be older than the pig being registered'),
+            content: Text('Mother must be older than the pig being registered'),
             backgroundColor: Colors.red,
           ),
         );

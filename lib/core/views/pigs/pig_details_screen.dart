@@ -4,7 +4,6 @@ import 'package:intl/intl.dart';
 import '../../models/pig_model.dart';
 import '../../models/pigpen_model.dart';
 import '../../models/event_model.dart';
-import '../events/event_management_screen.dart';
 import 'dart:io';
 
 class PigDetailsScreen extends StatefulWidget {
@@ -244,22 +243,8 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
               ? _currentPig.getPigpenName(widget.pigpens) ?? "Unknown"
               : "Unassigned",
         ),
-        _buildDetailRow(
-          "Mother's Tag",
-          _currentPig.motherTag ?? "-",
-          showSearchIcon: _currentPig.motherTag != null,
-          onSearchTap: _currentPig.motherTag != null
-              ? () => _navigateToParent(_currentPig.motherTag)
-              : null,
-        ),
-        _buildDetailRow(
-          "Father's Tag",
-          _currentPig.fatherTag ?? "-",
-          showSearchIcon: _currentPig.fatherTag != null,
-          onSearchTap: _currentPig.fatherTag != null
-              ? () => _navigateToParent(_currentPig.fatherTag)
-              : null,
-        ),
+        _buildParentDetailRow("Mother's Tag", _currentPig.motherTag),
+        _buildParentDetailRow("Father's Tag", _currentPig.fatherTag),
         _buildDetailRow(
           "Notes",
           (_currentPig.notes ?? "").isNotEmpty ? _currentPig.notes! : "-",
@@ -388,7 +373,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
       children: [
         const SizedBox(height: 16),
         Text(
-          "Pig's Offspring",
+          "Offspring (${offspring.length})",
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
@@ -396,12 +381,12 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
           ),
         ),
         const SizedBox(height: 8),
-        offspring.isEmpty
-            ? _buildNoOffspringMessage()
-            : Column(
-                children:
-                    offspring.map((pig) => _buildOffspringItem(pig)).toList(),
-              ),
+        if (offspring.isEmpty)
+          _buildNoOffspringMessage()
+        else
+          Column(
+            children: offspring.map((pig) => _buildOffspringItem(pig)).toList(),
+          ),
       ],
     );
   }
@@ -443,10 +428,19 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: Colors.grey[200],
-          child: Text(pig.tag[0]), // First letter of tag
+          child: Text(pig.genderSymbol),
         ),
         title: Text(pig.name ?? "Tag: ${pig.tag}"),
-        subtitle: Text("${pig.breed} • ${pig.getFormattedAge()}"),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text("${pig.breed} • ${pig.getFormattedAge()}"),
+            Text(
+              "Born: ${pig.dob}",
+              style: const TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => _navigateToPig(pig),
       ),
@@ -512,6 +506,42 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
   }
 
+  Widget _buildParentDetailRow(String label, String? tag) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 120,
+            child: Text(
+              "$label:",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: Colors.green[700],
+              ),
+            ),
+          ),
+          Expanded(
+            child: Row(
+              children: [
+                Text(tag ?? "-", style: const TextStyle(fontSize: 16)),
+                if (tag != null)
+                  IconButton(
+                    icon: const Icon(Icons.search, size: 18),
+                    onPressed: () => _navigateToParent(tag),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(String message, IconData icon) {
     return Center(
       child: Column(
@@ -536,22 +566,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     return const Center(
       child: CircularProgressIndicator(),
     );
-  }
-
-  Future<void> _editEvent(PigEvent event) async {
-    final updatedEvent = await Navigator.push<PigEvent>(
-      context,
-      MaterialPageRoute(
-        builder: (context) => EventManagementScreen(
-          allPigs: [_currentPig],
-          initialSelectedPigs: [_currentPig.tag],
-        ),
-      ),
-    );
-
-    if (updatedEvent != null && mounted) {
-      await _loadPigEvents();
-    }
   }
 
   Future<void> _showEventDetails(PigEvent event) async {
@@ -598,15 +612,15 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   // ==================== Pig Methods ====================
 
   void _navigateToParent(String? tag) {
-    if (tag == null || !mounted) return;
+    if (tag == null) return;
 
     try {
-      final parentPig = widget.allPigs.firstWhere((p) => p.tag == tag);
+      final parent = widget.allPigs.firstWhere((p) => p.tag == tag);
       Navigator.push(
         context,
         MaterialPageRoute(
           builder: (context) => PigDetailsScreen(
-            pig: parentPig,
+            pig: parent,
             pigpens: widget.pigpens,
             allPigs: widget.allPigs,
             onPigUpdated: widget.onPigUpdated,
@@ -615,11 +629,9 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         ),
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Parent pig not found')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Parent with tag $tag not found')),
+      );
     }
   }
 

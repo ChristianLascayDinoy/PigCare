@@ -94,16 +94,6 @@ class Pig extends HiveObject {
     return age > 180; // Approximately 6 months
   }
 
-  bool canBeParentOf(Pig offspring) {
-    try {
-      final parentDob = DateTime.parse(dob);
-      final childDob = DateTime.parse(offspring.dob);
-      return childDob.isAfter(parentDob);
-    } catch (e) {
-      return false;
-    }
-  }
-
   String get genderSymbol => gender == 'Male' ? '♂' : '♀';
 
   Future<void> assignToPigpen(Pigpen pigpen) async {
@@ -159,5 +149,42 @@ class Pig extends HiveObject {
       notes: json['notes'],
       imagePath: json['imagePath'],
     );
+  }
+
+  List<Pig> getOffspring(List<Pig> allPigs) {
+    return allPigs
+        .where((pig) => pig.motherTag == this.tag || pig.fatherTag == this.tag)
+        .toList();
+  }
+
+  Pig? getMother(List<Pig> allPigs) {
+    return motherTag != null
+        ? allPigs.firstWhereOrNull((pig) => pig.tag == motherTag)
+        : null;
+  }
+
+  Pig? getFather(List<Pig> allPigs) {
+    return fatherTag != null
+        ? allPigs.firstWhereOrNull((pig) => pig.tag == fatherTag)
+        : null;
+  }
+
+  bool canBeParentOf(Pig potentialChild) {
+    try {
+      final parentDob = DateTime.parse(dob);
+      final childDob = DateTime.parse(potentialChild.dob);
+      return childDob.isAfter(parentDob);
+    } catch (e) {
+      return false;
+    }
+  }
+}
+
+extension FirstWhereOrNullExtension<E> on Iterable<E> {
+  E? firstWhereOrNull(bool Function(E) test) {
+    for (E element in this) {
+      if (test(element)) return element;
+    }
+    return null;
   }
 }

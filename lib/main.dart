@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/event_model.dart';
+import 'package:pigcare/core/models/expense_model.dart';
+import 'package:pigcare/core/models/sale_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pigcare/core/models/feeding_schedule_model.dart';
 import 'package:pigcare/core/models/pig_model.dart';
@@ -84,6 +86,8 @@ Future<void> _initializeHive() async {
   Hive.registerAdapter(FeedAdapter());
   Hive.registerAdapter(FeedingScheduleAdapter());
   Hive.registerAdapter(PigEventAdapter());
+  Hive.registerAdapter(ExpenseAdapter());
+  Hive.registerAdapter(SaleAdapter());
 
   // Open all Hive boxes with error handling
   await Future.wait([
@@ -92,6 +96,8 @@ Future<void> _initializeHive() async {
     _openBox<Feed>('feedsBox'),
     _openBox<FeedingSchedule>('feedingSchedules'),
     _openBox<PigEvent>('pig_events'),
+    _openBox<Expense>('expenses'),
+    _openBox<Sale>('sales'),
   ]);
 }
 
@@ -256,7 +262,9 @@ class PigCareApp extends StatelessWidget {
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.done) {
             return snapshot.data ?? false
-                ? const DashboardScreen()
+                ? const DashboardScreen(
+                    allPigs: [],
+                  )
                 : const IntroScreen();
           }
           return const Scaffold(
@@ -399,7 +407,10 @@ class _IntroScreenState extends State<IntroScreen> {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const DashboardScreen()),
+      MaterialPageRoute(
+          builder: (context) => const DashboardScreen(
+                allPigs: [],
+              )),
     );
   }
 

@@ -5,14 +5,15 @@ import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
 import '../pigs/pigpen_management_screen.dart';
 import '../feeds/feed_management_screen.dart';
 import '../events/event_management_screen.dart';
-import '../expenses/expenses_screen.dart';
-import '../sales/sales_screen.dart';
+import '../expenses/expense_management_screen.dart';
+import '../sales/sales_management_screen.dart';
 import '../reports/reports_screen.dart';
 import '../../widgets/dashboard_card.dart';
 import '../../models/pigpen_model.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final List<Pig> allPigs;
+  const DashboardScreen({super.key, required this.allPigs});
 
   @override
   // ignore: library_private_types_in_public_api
@@ -149,7 +150,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => ExpensesScreen()),
+                            builder: (context) => ExpenseManagementScreen()),
                       );
                     },
                   ),
@@ -159,7 +160,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => SalesScreen()),
+                        MaterialPageRoute(
+                            builder: (context) =>
+                                SalesManagementScreen(allPigs: widget.allPigs)),
                       );
                     },
                   ),
