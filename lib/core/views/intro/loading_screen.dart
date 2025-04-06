@@ -46,18 +46,34 @@ class _LoadingScreenState extends State<LoadingScreen>
               builder: (context, child) {
                 return Transform.scale(
                   scale: _animation.value,
-                  child: child,
+                  child: Container(
+                    width: 150,
+                    height: 150,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.green[100], // Fallback color
+                      border: Border.all(
+                        color: Colors.green[700]!,
+                        width: 2,
+                      ),
+                    ),
+                    child: ClipOval(
+                      child: Image.asset(
+                        'lib/assets/images/pigcare_logo.jpeg',
+                        width: 150,
+                        height: 150,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(
+                          Icons.pets,
+                          size: 60,
+                          color: Colors.green,
+                        ),
+                      ),
+                    ),
+                  ),
                 );
               },
-              child: Image.asset(
-                'lib/assets/images/sample.jpg',
-                width: 150,
-                height: 150,
-                errorBuilder: (context, error, stackTrace) {
-                  // Fallback widget if image fails to load
-                  return const Icon(Icons.pets, size: 100, color: Colors.green);
-                },
-              ),
             ),
             const SizedBox(height: 30),
             // Loading indicator
