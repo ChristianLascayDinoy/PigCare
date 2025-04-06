@@ -19,11 +19,19 @@ class Feed extends HiveObject {
   @HiveField(4)
   DateTime purchaseDate;
 
+  @HiveField(5)
+  String supplier; // New field for supplier/store name
+
+  @HiveField(6)
+  String brand; // New field for feed brand
+
   Feed({
     required this.name,
     required this.quantity,
     required this.price,
     required this.purchaseDate,
+    required this.supplier,
+    required this.brand,
   }) : remainingQuantity = quantity; // Initialize remaining stock
 
   void deductFeed(double amount) {

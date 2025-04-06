@@ -1,74 +1,87 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/event_model.dart';
 import 'package:pigcare/core/models/expense_model.dart';
 import 'package:pigcare/core/models/sale_model.dart';
+import 'package:pigcare/core/views/intro/loading_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pigcare/core/models/feeding_schedule_model.dart';
 import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
 import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/views/dashboard/dashboard_screen.dart';
-import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:pigcare/core/views/intro/intro_screen.dart';
 
 void main() async {
-  // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Show loading screen immediately
+  runApp(
+    const MaterialApp(
+      home: LoadingScreen(),
+      debugShowCheckedModeBanner: false,
+    ),
+  );
+
   try {
-    // Initialize Hive
     await _initializeHive();
-
-    // Initialize app data and perform migrations
     await _initializeAppData();
-
-    // Open settings box for intro screen tracking
     await Hive.openBox('settings');
 
+    // Now run the actual app
     runApp(const PigCareApp());
   } catch (e) {
-    // Handle initialization errors gracefully
-    runApp(
-      MaterialApp(
-        home: Scaffold(
-          backgroundColor: Colors.green[50],
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline, size: 50, color: Colors.red),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Initialization Error',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green[800],
-                    ),
+    runApp(_ErrorApp(error: e));
+  }
+}
+
+class _ErrorApp extends StatelessWidget {
+  final dynamic error;
+
+  const _ErrorApp({required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.green[50],
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline, size: 50, color: Colors.red),
+                const SizedBox(height: 20),
+                Text(
+                  'Initialization Error',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[800],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Failed to initialize app: ${e.toString()}',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Failed to initialize app: ${error.toString()}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[700],
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 30, vertical: 15),
                   ),
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green[700],
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 30, vertical: 15),
-                    ),
-                    onPressed: () => main(),
-                    child: const Text(
-                      'Retry',
-                      style: TextStyle(color: Colors.white),
-                    ),
+                  onPressed: () => main(),
+                  child: const Text(
+                    'Retry',
+                    style: TextStyle(color: Colors.white),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
@@ -80,7 +93,6 @@ void main() async {
 Future<void> _initializeHive() async {
   await Hive.initFlutter();
 
-  // Register all Hive adapters
   Hive.registerAdapter(PigpenAdapter());
   Hive.registerAdapter(PigAdapter());
   Hive.registerAdapter(FeedAdapter());
@@ -89,7 +101,6 @@ Future<void> _initializeHive() async {
   Hive.registerAdapter(ExpenseAdapter());
   Hive.registerAdapter(SaleAdapter());
 
-  // Open all Hive boxes with error handling
   await Future.wait([
     _openBox<Pigpen>('pigpens'),
     _openBox<Pig>('pigs'),
@@ -106,28 +117,21 @@ Future<void> _openBox<T>(String boxName) async {
     await Hive.openBox<T>(boxName);
   } catch (e) {
     debugPrint('Error opening box $boxName: ${e.toString()}');
-    // Delete corrupt box and recreate
     await Hive.deleteBoxFromDisk(boxName);
     await Hive.openBox<T>(boxName);
   }
 }
 
 Future<void> _initializeAppData() async {
-  // Initialize the Unassigned pigpen
   await _initializeUnassignedPigpen();
-
-  // Perform data migrations if needed
   await _performDataMigrations();
 }
 
 Future<void> _initializeUnassignedPigpen() async {
   final pigpenBox = Hive.box<Pigpen>('pigpens');
-
-  // Check if Unassigned pigpen exists
   final hasUnassigned = pigpenBox.values.any((p) => p.name == "Unassigned");
 
   if (!hasUnassigned) {
-    // Create with empty pig list
     final unassigned = Pigpen(
       name: "Unassigned",
       description: "Pigs not assigned to any specific pigpen",
@@ -158,8 +162,6 @@ Future<bool> _getIntroCompletedStatus() async {
 Future<void> _migratePigpenReferences() async {
   final pigBox = Hive.box<Pig>('pigs');
   final pigpenBox = Hive.box<Pigpen>('pigpens');
-
-  // Get or create Unassigned pigpen
   final unassignedPigpen = pigpenBox.values.firstWhere(
     (p) => p.name == "Unassigned",
     orElse: () {
@@ -172,24 +174,20 @@ Future<void> _migratePigpenReferences() async {
     },
   );
 
-  // Get raw Hive data to access legacy fields
   final pigsMap = pigBox.toMap();
 
   for (final entry in pigsMap.entries) {
     final pigKey = entry.key;
     final pigData = entry.value as Map<dynamic, dynamic>;
 
-    // Skip if already migrated
     if (pigData['pigpenKey'] != null) continue;
 
-    // Check for legacy pigpen field
     if (pigData['pigpen'] != null) {
       try {
         final pigpenName = pigData['pigpen'] as String;
         final pigpen = pigpenBox.values.firstWhere(
           (p) => p.name == pigpenName,
         );
-        // Update with proper reference
         await pigBox.put(
           pigKey,
           Pig(
@@ -210,11 +208,9 @@ Future<void> _migratePigpenReferences() async {
           ),
         );
       } catch (e) {
-        // Fallback to Unassigned if pigpen not found
         await _assignToUnassigned(pigBox, pigKey, pigData, unassignedPigpen);
       }
     } else {
-      // No pigpen reference, assign to Unassigned
       await _assignToUnassigned(pigBox, pigKey, pigData, unassignedPigpen);
     }
   }
@@ -260,18 +256,20 @@ class PigCareApp extends StatelessWidget {
       home: FutureBuilder<bool>(
         future: _getIntroCompletedStatus(),
         builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.done) {
-            return snapshot.data ?? false
-                ? const DashboardScreen(
-                    allPigs: [],
-                  )
+          // Always show loading screen first
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const LoadingScreen();
+          }
+
+          // After data is loaded, show appropriate screen
+          if (snapshot.hasData) {
+            return snapshot.data!
+                ? const DashboardScreen(allPigs: [])
                 : const IntroScreen();
           }
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+
+          // If there's an error, show loading screen as fallback
+          return const LoadingScreen();
         },
       ),
     );
@@ -351,296 +349,4 @@ class PigCareApp extends StatelessWidget {
       ),
     );
   }
-}
-
-class IntroScreen extends StatefulWidget {
-  const IntroScreen({super.key});
-
-  @override
-  State<IntroScreen> createState() => _IntroScreenState();
-}
-
-class _IntroScreenState extends State<IntroScreen> {
-  final PageController _pageController = PageController();
-  int _currentPage = 0;
-
-  final List<OnboardingPage> _pages = [
-    OnboardingPage(
-      title: "Pigpen Management",
-      description: "Track all your pigpens and their populations at a glance",
-      icon: Icons.home_work,
-      color: Colors.green.shade100,
-      features: [
-        "View total pigpen count",
-        "See pigs per pen",
-        "Quick status overview"
-      ],
-    ),
-    OnboardingPage(
-      title: "Pig Tracking",
-      description: "Monitor individual pigs with detailed records",
-      icon: Icons.pets,
-      color: Colors.blue.shade100,
-      features: [
-        "Track growth and health",
-        "Manage breeding",
-        "Individual ID system"
-      ],
-    ),
-    OnboardingPage(
-      title: "Farm Operations",
-      description: "Complete farm management solution",
-      icon: Icons.agriculture,
-      color: Colors.orange.shade100,
-      features: [
-        "Feed management",
-        "Event tracking",
-        "Expenses & sales",
-        "Reports generation"
-      ],
-    ),
-  ];
-
-  void _completeOnboarding() async {
-    final settingsBox = Hive.box('settings');
-    await settingsBox.put('introCompleted', true);
-    if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-          builder: (context) => const DashboardScreen(
-                allPigs: [],
-              )),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Stack(
-        children: [
-          // Animated background
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  _pages[_currentPage].color,
-                  Colors.white,
-                ],
-              ),
-            ),
-          ),
-
-          SafeArea(
-            child: Column(
-              children: [
-                // Skip button (top-right)
-                if (_currentPage != _pages.length - 1)
-                  Align(
-                    alignment: Alignment.topRight,
-                    child: Container(
-                      padding: const EdgeInsets.all(16.0),
-                      child: TextButton(
-                        onPressed: _completeOnboarding,
-                        child: Text(
-                          "Skip",
-                          style: TextStyle(
-                            color: Colors.green[800],
-                            fontSize: 16,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                Expanded(
-                  child: PageView.builder(
-                    controller: _pageController,
-                    itemCount: _pages.length,
-                    onPageChanged: (index) =>
-                        setState(() => _currentPage = index),
-                    itemBuilder: (context, index) {
-                      return OnboardingPageContent(page: _pages[index]);
-                    },
-                  ),
-                ),
-
-                // Page indicator
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 20),
-                  child: SmoothPageIndicator(
-                    controller: _pageController,
-                    count: _pages.length,
-                    effect: const ExpandingDotsEffect(
-                      dotHeight: 8,
-                      dotWidth: 8,
-                      activeDotColor: Colors.green,
-                      dotColor: Colors.grey,
-                      spacing: 10,
-                      expansionFactor: 3,
-                    ),
-                  ),
-                ),
-
-                // Next/Get Started button
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 40, vertical: 20),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        if (_currentPage == _pages.length - 1) {
-                          _completeOnboarding();
-                        } else {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 500),
-                            curve: Curves.easeInOut,
-                          );
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 30, vertical: 15),
-                        elevation: 2,
-                      ),
-                      child: Text(
-                        _currentPage == _pages.length - 1
-                            ? "Get Started"
-                            : "Next",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class OnboardingPageContent extends StatelessWidget {
-  final OnboardingPage page;
-
-  const OnboardingPageContent({super.key, required this.page});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(30),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Icon illustration
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 10,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-            child: Icon(
-              page.icon,
-              size: 60,
-              color: Colors.green[800],
-            ),
-          ),
-
-          const SizedBox(height: 40),
-
-          // Title
-          Text(
-            page.title,
-            style: TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
-              color: Colors.green[900],
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 16),
-
-          // Description
-          Text(
-            page.description,
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[700],
-              height: 1.5,
-            ),
-            textAlign: TextAlign.center,
-          ),
-
-          const SizedBox(height: 24),
-
-          // Feature list
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: page.features
-                .map((feature) => Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.check_circle,
-                            color: Colors.green,
-                            size: 20,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              feature,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[800],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ))
-                .toList(),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class OnboardingPage {
-  final String title;
-  final String description;
-  final IconData icon;
-  final Color color;
-  final List<String> features;
-
-  const OnboardingPage({
-    required this.title,
-    required this.description,
-    required this.icon,
-    required this.color,
-    required this.features,
-  });
 }

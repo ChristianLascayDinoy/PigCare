@@ -48,6 +48,10 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
         TextEditingController(text: feed?.quantity.toStringAsFixed(2) ?? '');
     final TextEditingController priceController =
         TextEditingController(text: feed?.price.toStringAsFixed(2) ?? '');
+    final TextEditingController supplierController =
+        TextEditingController(text: feed?.supplier ?? '');
+    final TextEditingController brandController =
+        TextEditingController(text: feed?.brand ?? '');
     DateTime selectedPurchaseDate = feed?.purchaseDate ?? DateTime.now();
 
     Future<void> selectDate(BuildContext context) async {
@@ -84,6 +88,36 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     }
                     if (value.length > 50) {
                       return 'Name too long (max 50 chars)';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: brandController,
+                  decoration: const InputDecoration(
+                    labelText: "Brand *",
+                    border: OutlineInputBorder(),
+                    hintText: "Feed brand/manufacturer",
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter feed brand';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: supplierController,
+                  decoration: const InputDecoration(
+                    labelText: "Supplier/Store *",
+                    border: OutlineInputBorder(),
+                    hintText: "Where you purchased the feed",
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter supplier/store name';
                     }
                     return null;
                   },
@@ -179,6 +213,8 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     quantity: double.parse(quantityController.text),
                     price: double.parse(priceController.text),
                     purchaseDate: selectedPurchaseDate,
+                    supplier: supplierController.text.trim(),
+                    brand: brandController.text.trim(),
                   );
 
                   setState(() {
@@ -410,6 +446,8 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     columnSpacing: 24,
                     columns: const [
                       DataColumn(label: Text("Name")),
+                      DataColumn(label: Text("Brand")),
+                      DataColumn(label: Text("Supplier")),
                       DataColumn(label: Text("Qty (kg)"), numeric: true),
                       DataColumn(label: Text("Price (₱)"), numeric: true),
                       DataColumn(label: Text("Purchase Date")),
@@ -436,6 +474,8 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                               ),
                             ),
                           ),
+                          DataCell(Text(feed.brand)),
+                          DataCell(Text(feed.supplier)),
                           DataCell(
                             Text(
                               feed.quantity.toStringAsFixed(2),

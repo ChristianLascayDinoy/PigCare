@@ -82,12 +82,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   DashboardCard(
                     title: "Pigpens",
                     icon: Icons.home,
-                    onTap: () {
-                      Navigator.push(
+                    count: pigpenBox.length,
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => PigpenManagementScreen()),
+                          builder: (context) => PigpenManagementScreen(),
+                        ),
                       );
+                      // Optional: Refresh data when returning
+                      _loadTotalPigs();
                     },
                   ),
                   DashboardCard(
