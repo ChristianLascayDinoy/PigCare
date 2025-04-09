@@ -224,22 +224,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
 
     return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.all(12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.2),
-            spreadRadius: 2,
-            blurRadius: 5,
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
+        width: double.infinity,
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.2),
+              spreadRadius: 2,
+              blurRadius: 5,
+            ),
+          ],
+        ),
+        child: Column(children: [
           // First row (same as original)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -255,86 +254,92 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const Divider(height: 1, color: Colors.grey),
           const SizedBox(height: 12),
           // Second row with feeds and tasks
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              ValueListenableBuilder(
-                valueListenable: feedsBox.listenable(),
-                builder: (context, Box<Feed> box, _) {
-                  // Calculate feed metrics
-                  int lowStockCount = 0;
-                  for (final feed in box.values) {
-                    if (feed.quantity < lowStockThreshold) {
-                      lowStockCount++;
-                    }
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            ValueListenableBuilder(
+              valueListenable: feedsBox.listenable(),
+              builder: (context, Box<Feed> box, _) {
+                // Calculate feed metrics
+                int lowStockCount = 0;
+                for (final feed in box.values) {
+                  if (feed.remainingQuantity < lowStockThreshold) {
+                    lowStockCount++;
                   }
+                }
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.food_bank,
-                              size: 24, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Text("No. of Feeds: ${box.length}",
-                              style: TextStyle(fontSize: 16)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lowStockCount > 0
-                            ? "⚠️ $lowStockCount low stock"
-                            : "✅ Stock good",
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(children: [
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: "📊 Feeds Level: "),
+                            TextSpan(
+                              text: lowStockCount > 0
+                                  ? "⚠️ $lowStockCount low stock"
+                                  : "✅ Stock good",
+                              style: TextStyle(
+                                color: lowStockCount > 0
+                                    ? Colors.orange
+                                    : Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
                         style: TextStyle(
                           fontSize: 14,
-                          color:
-                              lowStockCount > 0 ? Colors.orange : Colors.green,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  );
-                },
-              ),
-              ValueListenableBuilder(
-                valueListenable: _tasksBox.listenable(),
-                builder: (context, Box<PigTask> box, _) {
-                  // Count upcoming tasks
-                  int upcomingTasks = box.values
-                      .where((task) =>
-                          !task.isCompleted &&
-                          task.date.isAfter(DateTime.now()))
-                      .length;
+                    ])
+                  ],
+                );
+              },
+            ),
+            ValueListenableBuilder(
+              valueListenable: _tasksBox.listenable(),
+              builder: (context, Box<PigTask> box, _) {
+                // Count upcoming tasks
+                int upcomingTasks = box.values
+                    .where((task) =>
+                        !task.isCompleted && task.date.isAfter(DateTime.now()))
+                    .length;
 
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.event,
-                              size: 24, color: Colors.green),
-                          const SizedBox(width: 8),
-                          Text("Tasks: $upcomingTasks",
-                              style: TextStyle(fontSize: 16)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        upcomingTasks > 0 ? "🕒 Upcoming" : "✅ All caught up",
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Row(children: [
+                      const Icon(Icons.event, size: 24, color: Colors.green),
+                      const SizedBox(width: 8),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(text: "Upcoming Tasks: "),
+                            TextSpan(
+                              text: upcomingTasks > 0
+                                  ? "$upcomingTasks Upcoming"
+                                  : "✅ All caught up",
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: upcomingTasks > 0
+                                    ? Colors.blue
+                                    : Colors.green,
+                              ),
+                            ),
+                          ],
+                        ),
                         style: TextStyle(
                           fontSize: 14,
-                          color: upcomingTasks > 0 ? Colors.blue : Colors.green,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ],
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
+                    ])
+                  ],
+                );
+              },
+            )
+          ])
+        ]));
   }
 
   Widget _buildDrawer(BuildContext context) {

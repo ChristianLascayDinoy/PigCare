@@ -59,7 +59,7 @@ class _LoadingScreenState extends State<LoadingScreen>
                     ),
                     child: ClipOval(
                       child: Image.asset(
-                        'lib/assets/images/pigcare_logo.jpeg',
+                        'lib/assets/images/pigcare_logo.jpg',
                         width: 150,
                         height: 150,
                         fit: BoxFit.cover,

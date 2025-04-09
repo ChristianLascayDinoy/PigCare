@@ -315,16 +315,16 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
       ),
       body: Column(
         children: [
-          // Stock Summary Card
+          // In your ValueListenableBuilder for the summary card:
           ValueListenableBuilder(
             valueListenable: feedsBox.listenable(),
             builder: (context, Box<Feed> box, _) {
-              double totalStock = 0;
+              double totalRemaining = 0;
               int lowStockCount = 0;
 
               for (final feed in box.values) {
-                totalStock += feed.quantity;
-                if (feed.quantity < lowStockThreshold) {
+                totalRemaining += feed.remainingQuantity;
+                if (feed.remainingQuantity < lowStockThreshold) {
                   lowStockCount++;
                 }
               }
@@ -349,13 +349,13 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        "📦 Total Stock: ${totalStock.toStringAsFixed(2)} kg",
+                        "📦 Total Remaining: ${totalRemaining.toStringAsFixed(2)} kg",
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         lowStockCount > 0
-                            ? "⚠️ $lowStockCount item(s) below $lowStockThreshold kg"
+                            ? "⚠️ $lowStockCount item(s) below $lowStockThreshold kg remaining"
                             : "✅ Stock levels are good",
                         style: TextStyle(
                           color: lowStockCount > 0
@@ -369,7 +369,6 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
               );
             },
           ),
-
           // Action Buttons
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -448,14 +447,16 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                       DataColumn(label: Text("Name")),
                       DataColumn(label: Text("Brand")),
                       DataColumn(label: Text("Supplier")),
-                      DataColumn(label: Text("Qty (kg)"), numeric: true),
+                      DataColumn(label: Text("Total Qty (kg)"), numeric: true),
+                      DataColumn(label: Text("Remaining (kg)"), numeric: true),
                       DataColumn(label: Text("Price (₱)"), numeric: true),
                       DataColumn(label: Text("Purchase Date")),
                       DataColumn(label: Text("Actions")),
                     ],
                     rows: List.generate(box.length, (index) {
                       final feed = box.getAt(index)!;
-                      final isLowStock = feed.quantity < lowStockThreshold;
+                      final isLowStock = feed.remainingQuantity <
+                          lowStockThreshold; // Now checks remaining
 
                       return DataRow(
                         color: MaterialStateProperty.resolveWith<Color?>(
@@ -476,11 +477,13 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                           ),
                           DataCell(Text(feed.brand)),
                           DataCell(Text(feed.supplier)),
+                          DataCell(Text(feed.quantity.toStringAsFixed(2))),
                           DataCell(
                             Text(
-                              feed.quantity.toStringAsFixed(2),
+                              feed.remainingQuantity.toStringAsFixed(2),
                               style: TextStyle(
                                 color: isLowStock ? Colors.red : null,
+                                fontWeight: isLowStock ? FontWeight.bold : null,
                               ),
                             ),
                           ),
