@@ -207,139 +207,174 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSummaryCard() {
-    // Calculate feed metrics
-    int lowStockCount = 0;
-    for (final feed in feedsBox.values) {
-      if (feed.quantity < lowStockThreshold) {
-        lowStockCount++;
-      }
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Determine if we're on a small screen
+        final bool isSmallScreen = constraints.maxWidth < 600;
 
-    // Count upcoming tasks
-    int upcomingTasks = 0;
-    for (final task in _tasksBox.values) {
-      if (!task.isCompleted && task.date.isAfter(DateTime.now())) {
-        upcomingTasks++;
-      }
-    }
-
-    return Container(
-        width: double.infinity,
-        margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 2,
-              blurRadius: 5,
-            ),
-          ],
-        ),
-        child: Column(children: [
-          // First row (same as original)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text("📦 Total Pigpens: ${pigpenBox.length}",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              Text("🐷 Total Pigs: $totalPigs",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        return Container(
+          width: double.infinity,
+          margin: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.2),
+                spreadRadius: 2,
+                blurRadius: 5,
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Divider line
-          const Divider(height: 1, color: Colors.grey),
-          const SizedBox(height: 12),
-          // Second row with feeds and tasks
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            ValueListenableBuilder(
-              valueListenable: feedsBox.listenable(),
-              builder: (context, Box<Feed> box, _) {
-                // Calculate feed metrics
-                int lowStockCount = 0;
-                for (final feed in box.values) {
-                  if (feed.remainingQuantity < lowStockThreshold) {
-                    lowStockCount++;
-                  }
-                }
+          child: Column(
+            children: [
+              // First row - adjust layout for small screens
+              isSmallScreen
+                  ? Column(
+                      children: [
+                        _buildPigpenCount(isSmallScreen),
+                        const SizedBox(height: 8),
+                        _buildTotalPigsCount(isSmallScreen),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildPigpenCount(isSmallScreen),
+                        _buildTotalPigsCount(isSmallScreen),
+                      ],
+                    ),
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(children: [
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: "📊 Feeds Level: "),
-                            TextSpan(
-                              text: lowStockCount > 0
-                                  ? "⚠️ $lowStockCount low stock"
-                                  : "✅ Stock good",
-                              style: TextStyle(
-                                color: lowStockCount > 0
-                                    ? Colors.orange
-                                    : Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ])
-                  ],
-                );
-              },
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Colors.grey),
+              const SizedBox(height: 12),
+
+              // Second row - adjust layout for small screens
+              isSmallScreen
+                  ? Column(
+                      children: [
+                        _buildFeedsStatus(isSmallScreen),
+                        const SizedBox(height: 8),
+                        _buildTasksStatus(isSmallScreen),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        _buildFeedsStatus(isSmallScreen),
+                        _buildTasksStatus(isSmallScreen),
+                      ],
+                    ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+// Helper widgets for each section
+  Widget _buildPigpenCount(bool isSmallScreen) {
+    return Text(
+      "📦 Total Pigpens: ${pigpenBox.length}",
+      style: TextStyle(
+        fontSize: isSmallScreen ? 16 : 18,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildTotalPigsCount(bool isSmallScreen) {
+    return Text(
+      "🐷 Total Pigs: $totalPigs",
+      style: TextStyle(
+        fontSize: isSmallScreen ? 16 : 18,
+        fontWeight: FontWeight.bold,
+      ),
+    );
+  }
+
+  Widget _buildFeedsStatus(bool isSmallScreen) {
+    return ValueListenableBuilder(
+      valueListenable: feedsBox.listenable(),
+      builder: (context, Box<Feed> box, _) {
+        int lowStockCount = 0;
+        for (final feed in box.values) {
+          if (feed.remainingQuantity < lowStockThreshold) {
+            lowStockCount++;
+          }
+        }
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: "📊 Feeds Level: "),
+                  TextSpan(
+                    text: lowStockCount > 0
+                        ? "⚠️ $lowStockCount low stock"
+                        : "✅ Stock good",
+                    style: TextStyle(
+                      color: lowStockCount > 0 ? Colors.orange : Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: isSmallScreen ? 14 : 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            ValueListenableBuilder(
-              valueListenable: _tasksBox.listenable(),
-              builder: (context, Box<PigTask> box, _) {
-                // Count upcoming tasks
-                int upcomingTasks = box.values
-                    .where((task) =>
-                        !task.isCompleted && task.date.isAfter(DateTime.now()))
-                    .length;
+          ],
+        );
+      },
+    );
+  }
 
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Row(children: [
-                      const Icon(Icons.event, size: 24, color: Colors.green),
-                      const SizedBox(width: 8),
-                      Text.rich(
-                        TextSpan(
-                          children: [
-                            TextSpan(text: "Upcoming Tasks: "),
-                            TextSpan(
-                              text: upcomingTasks > 0
-                                  ? "$upcomingTasks Upcoming"
-                                  : "✅ All caught up",
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: upcomingTasks > 0
-                                    ? Colors.blue
-                                    : Colors.green,
-                              ),
-                            ),
-                          ],
-                        ),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ])
-                  ],
-                );
-              },
-            )
-          ])
-        ]));
+  Widget _buildTasksStatus(bool isSmallScreen) {
+    return ValueListenableBuilder(
+      valueListenable: _tasksBox.listenable(),
+      builder: (context, Box<PigTask> box, _) {
+        // First convert to list, then filter to avoid constant context issues
+        final tasks = box.values.toList();
+        final upcomingTasks = tasks
+            .where((task) =>
+                !task.isCompleted && task.date.isAfter(DateTime.now()))
+            .length;
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.event,
+                size: 20, // Made constant size - you can adjust as needed
+                color: Colors.green),
+            const SizedBox(width: 8),
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: "Tasks: "),
+                  TextSpan(
+                    text: upcomingTasks > 0
+                        ? "$upcomingTasks Upcoming"
+                        : "✅ All caught up",
+                    style: TextStyle(
+                      fontSize: isSmallScreen ? 14 : 16,
+                      color: upcomingTasks > 0 ? Colors.blue : Colors.green,
+                    ),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: isSmallScreen ? 14 : 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildDrawer(BuildContext context) {
