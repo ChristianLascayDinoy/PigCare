@@ -1,26 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
-import '../../models/event_model.dart';
+import '../../models/task_model.dart'; // This should be updated to task_model.dart
 import '../../models/pig_model.dart';
 
-class EventManagementScreen extends StatefulWidget {
+class TaskManagementScreen extends StatefulWidget {
   final List<Pig> allPigs;
   final List<String> initialSelectedPigs;
 
-  const EventManagementScreen({
+  const TaskManagementScreen({
     super.key,
     required this.allPigs,
     required this.initialSelectedPigs,
   });
 
   @override
-  State<EventManagementScreen> createState() => _EventManagementScreenState();
+  State<TaskManagementScreen> createState() => _TaskManagementScreenState();
 }
 
-class _EventManagementScreenState extends State<EventManagementScreen> {
-  late Box<PigEvent> _eventsBox;
-  List<PigEvent> _allEvents = [];
+class _TaskManagementScreenState extends State<TaskManagementScreen> {
+  late Box<PigTask> _tasksBox;
+  List<PigTask> _allTasks = [];
   String _searchQuery = '';
   String _filterType = 'All';
   bool _isLoading = false;
@@ -33,8 +33,11 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
 
   Future<void> _initHive() async {
     try {
-      _eventsBox = await Hive.openBox<PigEvent>('pig_events');
-      _loadEvents();
+      if (!Hive.isAdapterRegistered(4)) {
+        Hive.registerAdapter(PigTaskAdapter());
+      }
+      _tasksBox = await Hive.openBox<PigTask>('pig_tasks');
+      _loadTasks();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -44,17 +47,17 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
-  Future<void> _loadEvents() async {
+  Future<void> _loadTasks() async {
     if (_isLoading) return;
     setState(() => _isLoading = true);
 
     try {
-      final events = _eventsBox.values.toList();
-      setState(() => _allEvents = events);
+      final tasks = _tasksBox.values.toList();
+      setState(() => _allTasks = tasks);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading events: $e')),
+          SnackBar(content: Text('Error loading tasks: $e')),
         );
       }
     } finally {
@@ -64,14 +67,14 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
-  Future<void> _deleteEvent(PigEvent event) async {
+  Future<void> _deleteTask(PigTask task) async {
     try {
-      await _eventsBox.delete(event.id);
-      await _loadEvents();
+      await _tasksBox.delete(task.id);
+      await _loadTasks();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Event successfully deleted'),
+            content: Text('Task successfully deleted'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -80,7 +83,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting event: $e'),
+            content: Text('Error deleting task: $e'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -88,16 +91,15 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
-  List<PigEvent> get _filteredEvents {
-    return _allEvents.where((event) {
+  List<PigTask> get _filteredTasks {
+    return _allTasks.where((task) {
       final matchesSearch =
-          event.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              (event.description
+          task.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+              (task.description
                       ?.toLowerCase()
                       .contains(_searchQuery.toLowerCase()) ??
                   false);
-      final matchesType =
-          _filterType == 'All' || event.eventType == _filterType;
+      final matchesType = _filterType == 'All' || task.taskType == _filterType;
       return matchesSearch && matchesType;
     }).toList()
       ..sort((a, b) {
@@ -112,14 +114,14 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Event Management"),
+        title: const Text("Task Management"), // Changed from Event Management
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            onPressed: () => _showAddEventDialog(context),
-            tooltip: 'Add new event',
+            onPressed: () => _showAddTaskDialog(context),
+            tooltip: 'Add new task', // Changed from event
           ),
         ],
       ),
@@ -127,7 +129,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         children: [
           _buildSearchAndFilter(),
           Expanded(
-            child: _isLoading ? _buildLoadingIndicator() : _buildEventList(),
+            child: _isLoading ? _buildLoadingIndicator() : _buildTaskList(),
           ),
         ],
       ),
@@ -147,7 +149,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
         children: [
           TextField(
             decoration: InputDecoration(
-              hintText: 'Search events...',
+              hintText: 'Search tasks...', // Changed from events
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),
@@ -175,13 +177,13 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     );
   }
 
-  Widget _buildEventList() {
-    if (_filteredEvents.isEmpty) {
+  Widget _buildTaskList() {
+    if (_filteredTasks.isEmpty) {
       return Center(
         child: Text(
           _searchQuery.isEmpty
-              ? "No events found\nAdd your first event!"
-              : "No events match your search",
+              ? "No tasks found\nAdd your first task!" // Changed from events
+              : "No tasks match your search", // Changed from events
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 18, color: Colors.grey),
         ),
@@ -189,19 +191,19 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
 
     return RefreshIndicator(
-      onRefresh: _loadEvents,
+      onRefresh: _loadTasks,
       child: ListView.builder(
         padding: const EdgeInsets.only(bottom: 16),
-        itemCount: _filteredEvents.length,
+        itemCount: _filteredTasks.length,
         itemBuilder: (context, index) {
-          final event = _filteredEvents[index];
-          return _buildEventCard(event);
+          final task = _filteredTasks[index];
+          return _buildTaskCard(task);
         },
       ),
     );
   }
 
-  Widget _buildEventCard(PigEvent event) {
+  Widget _buildTaskCard(PigTask task) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 2,
@@ -210,7 +212,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => _showEventDetails(context, event),
+        onTap: () => _showTaskDetails(context, task),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -221,18 +223,19 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      event.name,
+                      task.name,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: event.isCompleted ? Colors.green[700] : null,
+                        color: task.isCompleted ? Colors.green[700] : null,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Chip(
-                    label: Text(event.eventType),
-                    backgroundColor: _getEventTypeColor(event.eventType),
+                    label: Text(task.taskType), // Changed from eventType
+                    backgroundColor:
+                        _getTaskTypeColor(task.taskType), // Changed from event
                   ),
                 ],
               ),
@@ -240,24 +243,24 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
               Row(
                 children: [
                   Icon(
-                    event.isCompleted
+                    task.isCompleted
                         ? Icons.check_circle
                         : Icons.calendar_today,
                     size: 16,
-                    color: event.isCompleted ? Colors.green : Colors.grey[600],
+                    color: task.isCompleted ? Colors.green : Colors.grey[600],
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    DateFormat('MMM dd, yyyy').format(event.date),
+                    DateFormat('MMM dd, yyyy').format(task.date),
                     style: TextStyle(
-                      color: event.isCompleted
+                      color: task.isCompleted
                           ? Colors.green[700]
-                          : event.date.isAfter(DateTime.now())
+                          : task.date.isAfter(DateTime.now())
                               ? Colors.green[700]
                               : Colors.grey,
                     ),
                   ),
-                  if (event.isCompleted) ...[
+                  if (task.isCompleted) ...[
                     const SizedBox(width: 8),
                     Text(
                       '• Completed',
@@ -266,7 +269,7 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                         fontStyle: FontStyle.italic,
                       ),
                     ),
-                  ] else if (event.date.isAfter(DateTime.now())) ...[
+                  ] else if (task.date.isAfter(DateTime.now())) ...[
                     const Spacer(),
                     Chip(
                       label: const Text("Upcoming"),
@@ -276,44 +279,45 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                   ],
                 ],
               ),
-              if (event.isCompleted && event.completedDate != null) ...[
+              if (task.isCompleted && task.completedDate != null) ...[
                 const SizedBox(height: 4),
                 Text(
-                  'Completed on: ${DateFormat('MMM dd, yyyy').format(event.completedDate!)}',
+                  'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey[600],
                   ),
                 ),
               ],
-              if (event.description != null &&
-                  event.description!.isNotEmpty) ...[
+              if (task.description != null && task.description!.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 Text(
-                  event.description!,
+                  task.description!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
               ],
               const SizedBox(height: 8),
               Text(
-                "Pigs: ${event.pigTags.length}",
+                "Pigs: ${task.pigTags.length}",
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  if (!event.isCompleted) ...[
+                  if (!task.isCompleted) ...[
                     TextButton(
-                      onPressed: () => _markEventAsComplete(event),
+                      onPressed: () =>
+                          _markTaskAsComplete(task), // Changed from event
                       child: const Text("Mark Complete"),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _showEventDetails(context, event),
-                      tooltip: 'Edit event',
+                      onPressed: () =>
+                          _showTaskDetails(context, task), // Changed from event
+                      tooltip: 'Edit task', // Changed from event
                     ),
                   ],
                 ],
@@ -325,13 +329,13 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     );
   }
 
-  Future<void> _markEventAsComplete(PigEvent event) async {
+  Future<void> _markTaskAsComplete(PigTask task) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Completion"),
-        content: const Text(
-            "This will lock the event from further edits. Continue?"),
+        content:
+            const Text("This will lock the task from further edits. Continue?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -347,15 +351,15 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
 
     if (confirmed == true) {
       try {
-        final completedEvent = event.copyWith(
+        final completedTask = task.copyWith(
           isCompleted: true,
           completedDate: DateTime.now(),
         );
-        await _eventsBox.put(event.id, completedEvent);
-        await _loadEvents();
+        await _tasksBox.put(task.id, completedTask); // This saves to Hive
+        await _loadTasks();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Event marked as complete')),
+            const SnackBar(content: Text('Task marked as complete')),
           );
         }
       } catch (e) {
@@ -368,48 +372,49 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
     }
   }
 
-  Future<void> _showAddEventDialog(BuildContext context) async {
-    final result = await Navigator.of(context).push<PigEvent>(
+  Future<void> _showAddTaskDialog(BuildContext context) async {
+    final result = await Navigator.of(context).push<PigTask>(
       MaterialPageRoute(
-        builder: (context) => AddEditEventDialog(
+        builder: (context) => AddEditTaskDialog(
+          // Changed from Event
           allPigs: widget.allPigs,
-          existingEvent: null,
+          existingTask: null, // Changed from event
           initialSelectedPigs: widget.initialSelectedPigs,
-          eventsBox: _eventsBox,
+          tasksBox: _tasksBox, // Changed from eventsBox
         ),
         fullscreenDialog: true,
       ),
     );
 
     if (result != null && mounted) {
-      await _saveEvent(result);
+      await _saveTask(result); // Changed from event
     }
   }
 
-  Future<void> _showEventDetails(BuildContext context, PigEvent event) async {
-    if (event.isCompleted) {
-      // Read-only view for completed events with delete option
+  Future<void> _showTaskDetails(BuildContext context, PigTask task) async {
+    if (task.isCompleted) {
+      // Read-only view for completed tasks with delete option
       final shouldDelete = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: Text(event.name),
+          title: Text(task.name),
           content: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Type: ${event.eventType}'),
-                Text('Date: ${DateFormat.yMMMd().format(event.date)}'),
-                if (event.completedDate != null)
+                Text('Type: ${task.taskType}'), // Changed from eventType
+                Text('Date: ${DateFormat.yMMMd().format(task.date)}'),
+                if (task.completedDate != null)
                   Text(
-                      'Completed: ${DateFormat.yMMMd().format(event.completedDate!)}'),
+                      'Completed: ${DateFormat.yMMMd().format(task.completedDate!)}'),
                 const SizedBox(height: 16),
-                const Text('Pigs in this event:',
+                const Text('Pigs in this task:', // Changed from event
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 Column(
-                  children: event.pigTags.map((tag) => Text(tag)).toList(),
+                  children: task.pigTags.map((tag) => Text(tag)).toList(),
                 ),
                 const SizedBox(height: 16),
-                Text(event.description),
+                Text(task.description),
               ],
             ),
           ),
@@ -425,7 +430,8 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text("Confirm Delete"),
-                    content: Text("Delete ${event.name} event?"),
+                    content:
+                        Text("Delete ${task.name} task?"), // Changed from event
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
@@ -450,16 +456,17 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       );
 
       if (shouldDelete == true && mounted) {
-        await _deleteEvent(event);
+        await _deleteTask(task); // Changed from event
       }
     } else {
       final result = await Navigator.of(context).push<dynamic>(
         MaterialPageRoute(
-          builder: (context) => AddEditEventDialog(
+          builder: (context) => AddEditTaskDialog(
+            // Changed from Event
             allPigs: widget.allPigs,
-            existingEvent: event,
-            initialSelectedPigs: event.pigTags,
-            eventsBox: _eventsBox,
+            existingTask: task, // Changed from event
+            initialSelectedPigs: task.pigTags,
+            tasksBox: _tasksBox, // Changed from eventsBox
           ),
         ),
       );
@@ -467,34 +474,37 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
       if (mounted) {
         if (result is bool) {
           if (result) {
-            await _loadEvents();
+            await _loadTasks();
           }
-        } else if (result is PigEvent) {
-          await _saveEvent(result);
+        } else if (result is PigTask) {
+          await _saveTask(result); // Changed from event
         }
       }
     }
   }
 
-  Future<void> _saveEvent(PigEvent event) async {
+  Future<void> _saveTask(PigTask task) async {
     try {
-      await _eventsBox.put(event.id, event);
-      await _loadEvents();
+      await _tasksBox.put(task.id, task);
+      await _loadTasks();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Event saved successfully')),
+          const SnackBar(
+              content: Text('Task saved successfully')), // Changed from event
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving event: $e')),
+          SnackBar(
+              content: Text('Error saving task: $e')), // Changed from event
         );
       }
     }
   }
 
-  Color _getEventTypeColor(String type) {
+  Color _getTaskTypeColor(String type) {
+    // Changed from event
     switch (type) {
       case 'Health':
         return Colors.red[100]!;
@@ -510,33 +520,35 @@ class _EventManagementScreenState extends State<EventManagementScreen> {
   }
 }
 
-class AddEditEventDialog extends StatefulWidget {
+class AddEditTaskDialog extends StatefulWidget {
+  // Changed from Event
   final List<Pig> allPigs;
-  final PigEvent? existingEvent;
+  final PigTask? existingTask; // Changed from event
   final List<String> initialSelectedPigs;
-  final Box<PigEvent> eventsBox;
+  final Box<PigTask> tasksBox; // Changed from eventsBox
 
-  const AddEditEventDialog({
+  const AddEditTaskDialog({
     super.key,
     required this.allPigs,
-    this.existingEvent,
+    this.existingTask,
     required this.initialSelectedPigs,
-    required this.eventsBox,
+    required this.tasksBox,
   });
 
   @override
-  State<AddEditEventDialog> createState() => _AddEditEventDialogState();
+  State<AddEditTaskDialog> createState() => _AddEditTaskDialogState();
 }
 
-class _AddEditEventDialogState extends State<AddEditEventDialog> {
+class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   late DateTime _selectedDate;
-  late String _selectedEventType;
+  late String _selectedTaskType; // Changed from event
   late List<String> _selectedPigTags;
 
-  final List<String> _eventTypes = [
+  final List<String> _taskTypes = [
+    // Changed from event
     'Health',
     'Breeding',
     'Feeding',
@@ -547,12 +559,14 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController =
-        TextEditingController(text: widget.existingEvent?.name ?? '');
-    _descriptionController =
-        TextEditingController(text: widget.existingEvent?.description ?? '');
-    _selectedDate = widget.existingEvent?.date ?? DateTime.now();
-    _selectedEventType = widget.existingEvent?.eventType ?? 'Health';
+    _nameController = TextEditingController(
+        text: widget.existingTask?.name ?? ''); // Changed from event
+    _descriptionController = TextEditingController(
+        text: widget.existingTask?.description ?? ''); // Changed from event
+    _selectedDate =
+        widget.existingTask?.date ?? DateTime.now(); // Changed from event
+    _selectedTaskType =
+        widget.existingTask?.taskType ?? 'Health'; // Changed from event
     _selectedPigTags = List.from(widget.initialSelectedPigs);
   }
 
@@ -567,12 +581,14 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingEvent != null ? "Edit Event" : "Add Event"),
+        title: Text(widget.existingTask != null
+            ? "Edit Task"
+            : "Add Task"), // Changed from event
         actions: [
-          if (widget.existingEvent != null)
+          if (widget.existingTask != null)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _confirmDeleteEvent,
+              onPressed: _confirmDeleteTask, // Changed from event
             ),
         ],
       ),
@@ -585,7 +601,7 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: "Event Name *",
+                  labelText: "Task Name *", // Changed from event
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) =>
@@ -593,26 +609,26 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedEventType,
+                value: _selectedTaskType, // Changed from event
                 decoration: const InputDecoration(
-                  labelText: "Event Type *",
+                  labelText: "Task Type *", // Changed from event
                   border: OutlineInputBorder(),
                 ),
-                items: _eventTypes
+                items: _taskTypes // Changed from event
                     .map((type) => DropdownMenuItem(
                           value: type,
                           child: Text(type),
                         ))
                     .toList(),
-                onChanged: (value) =>
-                    setState(() => _selectedEventType = value!),
+                onChanged: (value) => setState(
+                    () => _selectedTaskType = value!), // Changed from event
               ),
               const SizedBox(height: 16),
               InkWell(
                 onTap: () => _selectDate(context),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: "Event Date *",
+                    labelText: "Task Date *", // Changed from event
                     border: OutlineInputBorder(),
                   ),
                   child: Row(
@@ -647,7 +663,7 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _saveEvent,
+                      onPressed: _saveTask, // Changed from event
                       child: const Text("Save"),
                     ),
                   ),
@@ -727,7 +743,8 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
     }
   }
 
-  Future<void> _saveEvent() async {
+  Future<void> _saveTask() async {
+    // Changed from event
     if (!_formKey.currentState!.validate()) return;
     if (_selectedPigTags.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -736,8 +753,9 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
       return;
     }
 
-    final event = PigEvent(
-      id: widget.existingEvent?.id ??
+    final task = PigTask(
+      // Changed from event
+      id: widget.existingTask?.id ?? // Changed from event
           DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text,
       date: _selectedDate,
@@ -745,22 +763,25 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
           ? _descriptionController.text
           : '',
       pigTags: _selectedPigTags,
-      eventType: _selectedEventType,
-      isCompleted: widget.existingEvent?.isCompleted ?? false,
-      completedDate: widget.existingEvent?.completedDate,
+      taskType: _selectedTaskType, // Changed from event
+      isCompleted:
+          widget.existingTask?.isCompleted ?? false, // Changed from event
+      completedDate: widget.existingTask?.completedDate, // Changed from event
     );
 
-    Navigator.pop(context, event);
+    Navigator.pop(context, task); // Changed from event
   }
 
-  Future<void> _confirmDeleteEvent() async {
-    if (widget.existingEvent == null) return;
+  Future<void> _confirmDeleteTask() async {
+    // Changed from event
+    if (widget.existingTask == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Delete"),
-        content: Text("Delete ${widget.existingEvent!.name} event?"),
+        content: Text(
+            "Delete ${widget.existingTask!.name} task?"), // Changed from event
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -776,11 +797,12 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
 
     if (confirmed == true) {
       try {
-        await widget.eventsBox.delete(widget.existingEvent!.id);
+        await widget.tasksBox
+            .delete(widget.existingTask!.id); // Changed from event
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Event successfully deleted'),
+              content: Text('Task successfully deleted'), // Changed from event
               duration: Duration(seconds: 2),
             ),
           );
@@ -790,7 +812,7 @@ class _AddEditEventDialogState extends State<AddEditEventDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting event: $e'),
+              content: Text('Error deleting task: $e'), // Changed from event
               duration: Duration(seconds: 2),
             ),
           );

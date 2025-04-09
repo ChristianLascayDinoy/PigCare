@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/models/pig_model.dart';
+import 'package:pigcare/core/models/task_model.dart';
 import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
-import '../pigs/pigpen_management_screen.dart';
+import '../pigpens/pigpen_management_screen.dart';
 import '../feeds/feed_management_screen.dart';
-import '../events/event_management_screen.dart';
+import '../tasks/task_management_screen.dart';
 import '../expenses/expense_management_screen.dart';
 import '../sales/sales_management_screen.dart';
 import '../reports/reports_screen.dart';
@@ -23,12 +25,18 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   late Box pigpenBox;
   int totalPigs = 0;
+  late Box<Feed> feedsBox;
+  late Box<PigTask> _tasksBox;
+  final double lowStockThreshold = 10.0;
 
   @override
   void initState() {
     super.initState();
+    feedsBox = Hive.box<Feed>('feedsBox');
+    _tasksBox = Hive.box<PigTask>('pig_tasks');
     _loadTotalPigs();
     Hive.box<Pigpen>('pigpens').listenable().addListener(_loadTotalPigs);
+    _tasksBox.listenable().addListener(_updateDashboard);
   }
 
   Future<void> _loadTotalPigs() async {
@@ -48,7 +56,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void dispose() {
     Hive.box('pigpens').listenable().removeListener(_loadTotalPigs);
+    _tasksBox.listenable().removeListener(_updateDashboard);
     super.dispose();
+  }
+
+  void _updateDashboard() {
+    setState(() {});
   }
 
   @override
@@ -82,7 +95,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   DashboardCard(
                     title: "Pigpens",
                     icon: Icons.home,
-                    count: pigpenBox.length,
                     onTap: () async {
                       await Navigator.push(
                         context,
@@ -120,33 +132,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   DashboardCard(
                     title: "Feeds",
                     icon: Icons.food_bank,
-                    onTap: () {
-                      Navigator.push(
+                    onTap: () async {
+                      await Navigator.push(
                         context,
                         MaterialPageRoute(
                             builder: (context) => FeedManagementScreen()),
                       );
+                      // This will trigger a rebuild when returning
+                      setState(() {});
                     },
                   ),
                   DashboardCard(
-                      title: "Events",
-                      icon: Icons.event,
-                      onTap: () {
-                        final pigpenBox = Hive.box<Pigpen>('pigpens');
-                        final allPigs = pigpenBox.values
-                            .expand((pigpen) => pigpen.pigs)
-                            .toList();
+                    title: "Tasks",
+                    icon: Icons.event,
+                    onTap: () {
+                      final pigpenBox = Hive.box<Pigpen>('pigpens');
+                      final allPigs = pigpenBox.values
+                          .expand((pigpen) => pigpen.pigs)
+                          .toList();
 
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => EventManagementScreen(
-                              allPigs: allPigs,
-                              initialSelectedPigs: [], // Empty if no specific pigs pre-selected
-                            ),
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => TaskManagementScreen(
+                            allPigs: allPigs,
+                            initialSelectedPigs: [],
                           ),
-                        );
-                      }),
+                        ),
+                      );
+                      // Remove the setState() call - it's not needed anymore
+                    },
+                  ),
                   DashboardCard(
                     title: "Expenses",
                     icon: Icons.attach_money,
@@ -191,6 +207,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _buildSummaryCard() {
+    // Calculate feed metrics
+    int lowStockCount = 0;
+    for (final feed in feedsBox.values) {
+      if (feed.quantity < lowStockThreshold) {
+        lowStockCount++;
+      }
+    }
+
+    // Count upcoming tasks
+    int upcomingTasks = 0;
+    for (final task in _tasksBox.values) {
+      if (!task.isCompleted && task.date.isAfter(DateTime.now())) {
+        upcomingTasks++;
+      }
+    }
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(12),
@@ -200,7 +232,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            // ignore: deprecated_member_use
             color: Colors.grey.withOpacity(0.2),
             spreadRadius: 2,
             blurRadius: 5,
@@ -209,13 +240,96 @@ class _DashboardScreenState extends State<DashboardScreen> {
       ),
       child: Column(
         children: [
+          // First row (same as original)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text("📦 Pigpens: ${pigpenBox.length}",
+              Text("📦 Total Pigpens: ${pigpenBox.length}",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               Text("🐷 Total Pigs: $totalPigs",
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Divider line
+          const Divider(height: 1, color: Colors.grey),
+          const SizedBox(height: 12),
+          // Second row with feeds and tasks
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              ValueListenableBuilder(
+                valueListenable: feedsBox.listenable(),
+                builder: (context, Box<Feed> box, _) {
+                  // Calculate feed metrics
+                  int lowStockCount = 0;
+                  for (final feed in box.values) {
+                    if (feed.quantity < lowStockThreshold) {
+                      lowStockCount++;
+                    }
+                  }
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.food_bank,
+                              size: 24, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Text("No. of Feeds: ${box.length}",
+                              style: TextStyle(fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        lowStockCount > 0
+                            ? "⚠️ $lowStockCount low stock"
+                            : "✅ Stock good",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color:
+                              lowStockCount > 0 ? Colors.orange : Colors.green,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+              ValueListenableBuilder(
+                valueListenable: _tasksBox.listenable(),
+                builder: (context, Box<PigTask> box, _) {
+                  // Count upcoming tasks
+                  int upcomingTasks = box.values
+                      .where((task) =>
+                          !task.isCompleted &&
+                          task.date.isAfter(DateTime.now()))
+                      .length;
+
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.event,
+                              size: 24, color: Colors.green),
+                          const SizedBox(width: 8),
+                          Text("Tasks: $upcomingTasks",
+                              style: TextStyle(fontSize: 16)),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        upcomingTasks > 0 ? "🕒 Upcoming" : "✅ All caught up",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: upcomingTasks > 0 ? Colors.blue : Colors.green,
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
             ],
           ),
         ],

@@ -1,7 +1,6 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:pigcare/core/models/event_model.dart';
+import 'package:pigcare/core/models/task_model.dart';
 import 'package:pigcare/core/models/expense_model.dart';
 import 'package:pigcare/core/models/sale_model.dart';
 import 'package:pigcare/core/views/intro/loading_screen.dart';
@@ -97,7 +96,7 @@ Future<void> _initializeHive() async {
   Hive.registerAdapter(PigAdapter());
   Hive.registerAdapter(FeedAdapter());
   Hive.registerAdapter(FeedingScheduleAdapter());
-  Hive.registerAdapter(PigEventAdapter());
+  Hive.registerAdapter(PigTaskAdapter());
   Hive.registerAdapter(ExpenseAdapter());
   Hive.registerAdapter(SaleAdapter());
 
@@ -106,7 +105,7 @@ Future<void> _initializeHive() async {
     _openBox<Pig>('pigs'),
     _openBox<Feed>('feedsBox'),
     _openBox<FeedingSchedule>('feedingSchedules'),
-    _openBox<PigEvent>('pig_events'),
+    _openBox<PigTask>('pig_tasks'),
     _openBox<Expense>('expenses'),
     _openBox<Sale>('sales'),
   ]);

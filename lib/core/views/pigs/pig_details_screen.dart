@@ -3,7 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import '../../models/pig_model.dart';
 import '../../models/pigpen_model.dart';
-import '../../models/event_model.dart';
+import '../../models/task_model.dart'; // This should be updated to task_model.dart
 import 'dart:io';
 
 class PigDetailsScreen extends StatefulWidget {
@@ -30,10 +30,11 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late Pig _currentPig;
-  late Box<PigEvent> _eventsBox;
-  List<PigEvent> _upcomingEvents = [];
-  List<PigEvent> _pastEvents = [];
-  bool _isLoadingEvents = false;
+  late Box<PigTask> _tasksBox; // Changed from PigEvent to PigTask
+  List<PigTask> _upcomingTasks = []; // Changed from Events to Tasks
+  List<PigTask> _pastTasks = []; // Changed from Events to Tasks
+  bool _isLoadingTasks = false; // Changed from Events to Tasks
+
   List<Pig> _getOffspring() {
     return widget.allPigs
         .where((pig) =>
@@ -54,41 +55,45 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   void _handleTabChange() {
     if (!_tabController.indexIsChanging &&
         (_tabController.index == 1 || _tabController.index == 2)) {
-      _loadPigEvents();
+      _loadPigTasks(); // Changed from Events to Tasks
     }
   }
 
   Future<void> _initHive() async {
-    _eventsBox = await Hive.openBox<PigEvent>('pig_events');
+    _tasksBox =
+        await Hive.openBox<PigTask>('pig_tasks'); // Changed from pig_events
   }
 
-  Future<void> _loadPigEvents() async {
-    setState(() => _isLoadingEvents = true);
+  Future<void> _loadPigTasks() async {
+    // Changed from Events to Tasks
+    setState(() => _isLoadingTasks = true);
 
     try {
-      final allEvents = _eventsBox.values
-          .where((event) => event.pigTags.contains(_currentPig.tag))
+      final allTasks = _tasksBox.values
+          .where((task) => task.pigTags.contains(_currentPig.tag))
           .toList();
 
       setState(() {
-        _upcomingEvents = allEvents
-            .where((e) => !e.isCompleted) // Only incomplete events
+        _upcomingTasks = allTasks
+            .where((e) => !e.isCompleted) // Only incomplete tasks
             .toList()
           ..sort((a, b) => a.date.compareTo(b.date));
 
-        _pastEvents = allEvents
-            .where((e) => e.isCompleted) // Only completed events
+        _pastTasks = allTasks
+            .where((e) => e.isCompleted) // Only completed tasks
             .toList()
           ..sort((a, b) => b.date.compareTo(a.date));
       });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading events: ${e.toString()}')),
+          SnackBar(
+              content: Text(
+                  'Error loading tasks: ${e.toString()}')), // Changed from events
         );
       }
     } finally {
-      setState(() => _isLoadingEvents = false);
+      setState(() => _isLoadingTasks = false);
     }
   }
 
@@ -136,7 +141,9 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
           indicatorColor: Colors.white,
           tabs: const [
             Tab(icon: Icon(Icons.info_outline), text: "Details"),
-            Tab(icon: Icon(Icons.event_available), text: "Events"),
+            Tab(
+                icon: Icon(Icons.task_alt),
+                text: "Tasks"), // Changed from events
             Tab(icon: Icon(Icons.history), text: "History"),
           ],
         ),
@@ -145,7 +152,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         controller: _tabController,
         children: [
           _buildDetailsTab(),
-          _buildEventsTab(),
+          _buildTasksTab(), // Changed from events
           _buildHistoryTab(),
         ],
       ),
@@ -254,44 +261,49 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
   }
 
-  Widget _buildEventsTab() {
-    return _isLoadingEvents
+  Widget _buildTasksTab() {
+    // Changed from Events to Tasks
+    return _isLoadingTasks
         ? _buildLoadingIndicator()
-        : _upcomingEvents.isEmpty
+        : _upcomingTasks.isEmpty
             ? _buildEmptyState(
-                "No upcoming events",
-                Icons.event,
+                "No upcoming tasks", // Changed from events
+                Icons.task, // Changed from event
               )
             : RefreshIndicator(
-                onRefresh: _loadPigEvents,
+                onRefresh: _loadPigTasks, // Changed from events
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _upcomingEvents.length,
+                  itemCount: _upcomingTasks.length,
                   itemBuilder: (context, index) {
-                    return _buildEventCard(_upcomingEvents[index]);
+                    return _buildTaskCard(
+                        _upcomingTasks[index]); // Changed from event
                   },
                 ),
               );
   }
 
   Widget _buildHistoryTab() {
-    return _isLoadingEvents
+    return _isLoadingTasks
         ? _buildLoadingIndicator()
-        : _pastEvents.isEmpty
-            ? _buildEmptyState("No past events", Icons.history)
+        : _pastTasks.isEmpty
+            ? _buildEmptyState(
+                "No past tasks", Icons.history) // Changed from events
             : RefreshIndicator(
-                onRefresh: _loadPigEvents,
+                onRefresh: _loadPigTasks, // Changed from events
                 child: ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _pastEvents.length,
+                  itemCount: _pastTasks.length,
                   itemBuilder: (context, index) {
-                    return _buildEventCard(_pastEvents[index]);
+                    return _buildTaskCard(
+                        _pastTasks[index]); // Changed from event
                   },
                 ),
               );
   }
 
-  Widget _buildEventCard(PigEvent event) {
+  Widget _buildTaskCard(PigTask task) {
+    // Changed from Event to Task
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -300,7 +312,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => _showEventDetails(event),
+        onTap: () => _showTaskDetails(task), // Changed from event
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -311,11 +323,11 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                 children: [
                   Flexible(
                     child: Text(
-                      event.name,
+                      task.name,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: event.isUpcoming
+                        color: task.isUpcoming
                             ? Colors.green[700]
                             : Colors.grey[700],
                       ),
@@ -323,8 +335,9 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                     ),
                   ),
                   Chip(
-                    label: Text(event.eventType),
-                    backgroundColor: _getEventTypeColor(event.eventType),
+                    label: Text(task.taskType), // Changed from eventType
+                    backgroundColor:
+                        _getTaskTypeColor(task.taskType), // Changed from event
                   ),
                 ],
               ),
@@ -338,12 +351,12 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    DateFormat('MMM dd, yyyy').format(event.date),
+                    DateFormat('MMM dd, yyyy').format(task.date),
                     style: TextStyle(
-                      color: event.isUpcoming ? Colors.green[700] : Colors.grey,
+                      color: task.isUpcoming ? Colors.green[700] : Colors.grey,
                     ),
                   ),
-                  if (event.isUpcoming) ...[
+                  if (task.isUpcoming) ...[
                     const Spacer(),
                     Chip(
                       label: const Text("Upcoming"),
@@ -355,7 +368,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
               ),
               const SizedBox(height: 12),
               Text(
-                event.description,
+                task.description,
                 style: const TextStyle(fontSize: 14),
               ),
             ],
@@ -568,28 +581,30 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
   }
 
-  Future<void> _showEventDetails(PigEvent event) async {
-    final result = await showDialog<PigEvent>(
+  Future<void> _showTaskDetails(PigTask task) async {
+    // Changed from Event to Task
+    final result = await showDialog<PigTask>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(event.name),
+        title: Text(task.name),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                DateFormat.yMMMMd().add_jm().format(event.date),
+                DateFormat.yMMMMd().add_jm().format(task.date),
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               Chip(
-                label: Text(event.eventType),
-                backgroundColor: _getEventTypeColor(event.eventType),
+                label: Text(task.taskType), // Changed from eventType
+                backgroundColor:
+                    _getTaskTypeColor(task.taskType), // Changed from event
               ),
               const SizedBox(height: 16),
               Text(
-                event.description,
+                task.description,
                 style: const TextStyle(fontSize: 16),
               ),
             ],
@@ -605,7 +620,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     );
 
     if (result != null && mounted) {
-      await _loadPigEvents();
+      await _loadPigTasks(); // Changed from events
     }
   }
 
@@ -709,7 +724,8 @@ Father: ${_currentPig.fatherTag ?? '-'}
     );
   }
 
-  Color _getEventTypeColor(String type) {
+  Color _getTaskTypeColor(String type) {
+    // Changed from Event to Task
     switch (type) {
       case 'Health':
         return Colors.red[100]!;

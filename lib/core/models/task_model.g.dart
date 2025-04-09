@@ -1,35 +1,37 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 
-part of 'event_model.dart';
+part of 'task_model.dart';
 
 // **************************************************************************
 // TypeAdapterGenerator
 // **************************************************************************
 
-class PigEventAdapter extends TypeAdapter<PigEvent> {
+class PigTaskAdapter extends TypeAdapter<PigTask> {
   @override
   final int typeId = 4;
 
   @override
-  PigEvent read(BinaryReader reader) {
+  PigTask read(BinaryReader reader) {
     final numOfFields = reader.readByte();
     final fields = <int, dynamic>{
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
-    return PigEvent(
+    return PigTask(
       id: fields[0] as String,
       name: fields[1] as String,
       date: fields[2] as DateTime,
       description: fields[3] as String,
       pigTags: (fields[4] as List).cast<String>(),
-      eventType: fields[5] as String,
+      taskType: fields[5] as String,
+      isCompleted: fields[6] as bool,
+      completedDate: fields[7] as DateTime?,
     );
   }
 
   @override
-  void write(BinaryWriter writer, PigEvent obj) {
+  void write(BinaryWriter writer, PigTask obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class PigEventAdapter extends TypeAdapter<PigEvent> {
       ..writeByte(4)
       ..write(obj.pigTags)
       ..writeByte(5)
-      ..write(obj.eventType);
+      ..write(obj.taskType)
+      ..writeByte(6)
+      ..write(obj.isCompleted)
+      ..writeByte(7)
+      ..write(obj.completedDate);
   }
 
   @override
@@ -50,7 +56,7 @@ class PigEventAdapter extends TypeAdapter<PigEvent> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is PigEventAdapter &&
+      other is PigTaskAdapter &&
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }

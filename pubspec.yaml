@@ -21,6 +21,9 @@ version: 1.0.0+1
 environment:
   sdk: ^3.6.1
 
+dependency_overrides:
+  analyzer: ^6.0.0
+
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
 # consider running `flutter pub upgrade --major-versions`. Alternatively,
@@ -42,6 +45,7 @@ dependencies:
   intl: ^0.20.2
   smooth_page_indicator: ^1.2.1
   flutter_svg: ^2.0.17
+  dcdg: 4.1.0
 
 dev_dependencies:
   flutter_test:

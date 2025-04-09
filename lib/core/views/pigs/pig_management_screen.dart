@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive/hive.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
@@ -600,16 +601,29 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
       children: [
         TextFormField(
           controller: _controllers['tag'],
+          inputFormatters: [
+            FilteringTextInputFormatter.deny(
+                RegExp(r'^\s')), // No leading space
+            FilteringTextInputFormatter.deny(
+                RegExp(r'\s{2,}')), // No multiple spaces
+          ],
           decoration: const InputDecoration(
             labelText: "Tag Number *",
             border: OutlineInputBorder(),
           ),
           readOnly: widget.existingPig != null,
           validator: (value) {
-            if (value == null || value.isEmpty) return 'Required field';
-            if (widget.existingPig == null &&
-                widget.allPigs.any((pig) => pig.tag == value)) {
-              return 'Tag number must be unique';
+            final trimmedValue = value?.trim() ?? '';
+            if (trimmedValue.isEmpty) return 'Required field';
+            if (trimmedValue.replaceAll(' ', '').isEmpty) {
+              return 'Tag cannot be just spaces';
+            }
+
+            // Check against all existing tags (trimmed)
+            if (widget.existingPig == null) {
+              final isDuplicate = widget.allPigs.any((pig) =>
+                  pig.tag.trim().toLowerCase() == trimmedValue.toLowerCase());
+              if (isDuplicate) return 'Tag number must be unique';
             }
             return null;
           },
@@ -918,7 +932,7 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
     }
 
     final newPig = Pig(
-      tag: _controllers['tag']!.text,
+      tag: _controllers['tag']!.text.trim(),
       name: _controllers['name']!.text.isNotEmpty
           ? _controllers['name']!.text
           : null,

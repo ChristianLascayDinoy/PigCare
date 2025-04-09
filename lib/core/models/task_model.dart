@@ -1,12 +1,9 @@
 import 'package:hive/hive.dart';
 
-part 'event_model.g.dart';
+part 'task_model.g.dart';
 
 @HiveType(typeId: 4)
-class PigEvent {
-  bool isCompleted;
-  DateTime? completedDate;
-
+class PigTask {
   bool get isUpcoming => !isCompleted && date.isAfter(DateTime.now());
   bool get isPast => isCompleted || date.isBefore(DateTime.now());
   bool get canEdit => !isCompleted;
@@ -27,41 +24,47 @@ class PigEvent {
   final List<String> pigTags;
 
   @HiveField(5)
-  final String eventType;
+  final String taskType;
 
-  PigEvent({
+  @HiveField(6)
+  bool isCompleted;
+
+  @HiveField(7)
+  DateTime? completedDate; // Changed from eventType to taskType
+
+  PigTask({
     required this.id,
     required this.name,
     required this.date,
     required this.description,
     required this.pigTags,
-    required this.eventType,
+    required this.taskType,
     this.isCompleted = false,
     this.completedDate,
   });
 
-  PigEvent copyWith({
+  PigTask copyWith({
     String? id,
     String? name,
     DateTime? date,
     String? description,
     List<String>? pigTags,
-    String? eventType,
+    String? taskType,
     bool? isCompleted,
     DateTime? completedDate,
   }) {
-    return PigEvent(
+    return PigTask(
       id: id ?? this.id,
       name: name ?? this.name,
       date: date ?? this.date,
       description: description ?? this.description,
       pigTags: pigTags ?? this.pigTags,
-      eventType: eventType ?? this.eventType,
+      taskType: taskType ?? this.taskType,
       isCompleted: isCompleted ?? this.isCompleted,
       completedDate: completedDate ?? this.completedDate,
     );
   }
 
-  // Helper method to check if event applies to a specific pig
+  // Helper method to check if task applies to a specific pig
   bool appliesToPig(String pigTag) => pigTags.contains(pigTag);
 }

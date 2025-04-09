@@ -217,13 +217,13 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     brand: brandController.text.trim(),
                   );
 
-                  setState(() {
-                    if (index == null) {
-                      feedsBox.add(newFeed);
-                    } else {
-                      feedsBox.putAt(index, newFeed);
-                    }
-                  });
+                  if (index == null) {
+                    feedsBox.add(
+                        newFeed); // This will trigger the ValueListenableBuilder
+                  } else {
+                    feedsBox.putAt(index,
+                        newFeed); // This will trigger the ValueListenableBuilder
+                  }
 
                   Navigator.pop(context);
                 } catch (e) {

@@ -23,17 +23,22 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
 
   void _loadExistingNames() {
     _existingNames.clear();
-    _existingNames.addAll(_pigpenBox.values.map((p) => p.name.toLowerCase()));
+    _existingNames
+        .addAll(_pigpenBox.values.map((p) => p.name.trim().toLowerCase()));
   }
 
   bool _isNameDuplicate(String name, {Pigpen? excludePigpen}) {
-    final lowerName = name.toLowerCase();
+    final normalizedName = name.trim().toLowerCase();
+
     if (excludePigpen != null) {
-      return _existingNames
-          .where((n) => n != excludePigpen.name.toLowerCase())
-          .contains(lowerName);
+      return _existingNames.any((existingName) =>
+          existingName.trim().toLowerCase() == normalizedName &&
+          existingName.toLowerCase() !=
+              excludePigpen.name.trim().toLowerCase());
     }
-    return _existingNames.contains(lowerName);
+
+    return _existingNames.any(
+        (existingName) => existingName.trim().toLowerCase() == normalizedName);
   }
 
   Future<void> _showAddEditDialog({Pigpen? pigpen}) async {
@@ -62,13 +67,17 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                     hintText: "Enter unique name",
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
+                    final trimmedValue = value?.trim() ?? '';
+                    if (trimmedValue.isEmpty) {
                       return 'Please enter a name';
                     }
-                    if (value.toLowerCase() == "unassigned") {
+                    if (trimmedValue.replaceAll(' ', '').isEmpty) {
+                      return 'Name cannot be just spaces';
+                    }
+                    if (trimmedValue.toLowerCase() == "unassigned") {
                       return '"Unassigned" is a reserved name';
                     }
-                    if (_isNameDuplicate(value, excludePigpen: pigpen)) {
+                    if (_isNameDuplicate(trimmedValue, excludePigpen: pigpen)) {
                       return 'Pigpen name already exists';
                     }
                     return null;

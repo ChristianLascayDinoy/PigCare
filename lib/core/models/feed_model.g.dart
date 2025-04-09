@@ -29,7 +29,7 @@ class FeedAdapter extends TypeAdapter<Feed> {
   @override
   void write(BinaryWriter writer, Feed obj) {
     writer
-      ..writeByte(7) // Updated to 7 fields
+      ..writeByte(7)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
