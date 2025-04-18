@@ -23,7 +23,10 @@ class Feed extends HiveObject {
   String supplier; // New field for supplier/store name
 
   @HiveField(6)
-  String brand; // New field for feed brand
+  String brand; // New field for feed
+
+  @HiveField(7)
+  String? expenseId;
 
   Feed({
     required this.name,
@@ -32,7 +35,28 @@ class Feed extends HiveObject {
     required this.purchaseDate,
     required this.supplier,
     required this.brand,
+    this.expenseId,
   }) : remainingQuantity = quantity; // Initialize remaining stock
+
+  Feed copyWith({
+    String? name,
+    double? quantity,
+    double? price,
+    DateTime? purchaseDate,
+    String? supplier,
+    String? brand,
+    String? expenseId,
+  }) {
+    return Feed(
+      name: name ?? this.name,
+      quantity: quantity ?? this.quantity,
+      price: price ?? this.price,
+      purchaseDate: purchaseDate ?? this.purchaseDate,
+      supplier: supplier ?? this.supplier,
+      brand: brand ?? this.brand,
+      expenseId: expenseId ?? this.expenseId,
+    );
+  }
 
   void deductFeed(double amount) {
     remainingQuantity -= amount;

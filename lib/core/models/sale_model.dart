@@ -1,52 +1,52 @@
+// models/sale_model.dart
 import 'package:hive/hive.dart';
 
 part 'sale_model.g.dart';
 
-@HiveType(typeId: 6) // Unique typeId
+@HiveType(typeId: 6) // Make sure this ID is unique in your app
 class Sale {
   @HiveField(0)
   final String id;
 
   @HiveField(1)
-  final String pigTag; // Reference to the pig sold
+  final String pigTag;
 
   @HiveField(2)
-  final double amount;
+  final String buyerName;
 
   @HiveField(3)
-  final DateTime date;
+  final double amount;
 
   @HiveField(4)
-  final String buyer;
+  final DateTime date;
 
   @HiveField(5)
-  final String? notes;
+  final String? description;
 
   Sale({
     required this.id,
     required this.pigTag,
+    required this.buyerName,
     required this.amount,
     required this.date,
-    required this.buyer,
-    this.notes,
+    this.description,
   });
 
-  // Helper method to create a copy with updated fields
   Sale copyWith({
     String? id,
     String? pigTag,
+    String? buyerName,
     double? amount,
     DateTime? date,
-    String? buyer,
-    String? notes,
+    String? description,
   }) {
     return Sale(
       id: id ?? this.id,
       pigTag: pigTag ?? this.pigTag,
+      buyerName: buyerName ?? this.buyerName,
       amount: amount ?? this.amount,
       date: date ?? this.date,
-      buyer: buyer ?? this.buyer,
-      notes: notes ?? this.notes,
+      description: description ?? this.description,
     );
   }
 }

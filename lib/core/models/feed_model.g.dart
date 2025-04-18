@@ -23,13 +23,14 @@ class FeedAdapter extends TypeAdapter<Feed> {
       purchaseDate: fields[4] as DateTime,
       supplier: fields[5] as String,
       brand: fields[6] as String,
+      expenseId: fields[7] as String?,
     )..remainingQuantity = fields[2] as double;
   }
 
   @override
   void write(BinaryWriter writer, Feed obj) {
     writer
-      ..writeByte(7)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -43,7 +44,9 @@ class FeedAdapter extends TypeAdapter<Feed> {
       ..writeByte(5)
       ..write(obj.supplier)
       ..writeByte(6)
-      ..write(obj.brand);
+      ..write(obj.brand)
+      ..writeByte(7)
+      ..write(obj.expenseId);
   }
 
   @override

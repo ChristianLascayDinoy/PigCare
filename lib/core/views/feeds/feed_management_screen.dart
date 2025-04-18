@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 import 'package:pigcare/core/models/feed_model.dart';
+import 'package:pigcare/core/providers/feed_expense_provider.dart';
 import 'package:pigcare/core/views/feeds/feeding_schedule_screen.dart';
 
 class FeedManagementScreen extends StatefulWidget {
@@ -13,45 +15,55 @@ class FeedManagementScreen extends StatefulWidget {
 }
 
 class _FeedManagementScreenState extends State<FeedManagementScreen> {
-  late Box<Feed> feedsBox;
   final double lowStockThreshold = 10.0;
   bool _isLoading = true;
+  bool _initializationError = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeHive();
+    _initializeData();
   }
 
-  Future<void> _initializeHive() async {
+  Future<void> _initializeData() async {
     try {
-      if (!Hive.isBoxOpen('feedsBox')) {
-        await Hive.openBox<Feed>('feedsBox');
-      }
       setState(() {
-        feedsBox = Hive.box<Feed>('feedsBox');
+        _isLoading = true;
+        _initializationError = false;
+      });
+
+      final provider = Provider.of<FeedExpenseProvider>(context, listen: false);
+      await provider.initialize();
+      setState(() {
         _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load feed data: ${e.toString()}')),
-      );
+      debugPrint('Initialization error: $e');
+      setState(() {
+        _isLoading = false;
+        _initializationError = true;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to initialize: ${e.toString()}'),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
     }
   }
 
   void _showFeedDialog({Feed? feed, int? index}) {
     final formKey = GlobalKey<FormState>();
-    final TextEditingController nameController =
-        TextEditingController(text: feed?.name ?? '');
-    final TextEditingController quantityController =
+    final nameController = TextEditingController(text: feed?.name ?? '');
+    final quantityController =
         TextEditingController(text: feed?.quantity.toStringAsFixed(2) ?? '');
-    final TextEditingController priceController =
+    final priceController =
         TextEditingController(text: feed?.price.toStringAsFixed(2) ?? '');
-    final TextEditingController supplierController =
+    final supplierController =
         TextEditingController(text: feed?.supplier ?? '');
-    final TextEditingController brandController =
-        TextEditingController(text: feed?.brand ?? '');
+    final brandController = TextEditingController(text: feed?.brand ?? '');
     DateTime selectedPurchaseDate = feed?.purchaseDate ?? DateTime.now();
 
     Future<void> selectDate(BuildContext context) async {
@@ -205,9 +217,11 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
             child: const Text("Cancel"),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               if (formKey.currentState!.validate()) {
                 try {
+                  final provider =
+                      Provider.of<FeedExpenseProvider>(context, listen: false);
                   final newFeed = Feed(
                     name: nameController.text.trim(),
                     quantity: double.parse(quantityController.text),
@@ -218,19 +232,27 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                   );
 
                   if (index == null) {
-                    feedsBox.add(
-                        newFeed); // This will trigger the ValueListenableBuilder
+                    await provider.addFeedWithExpense(newFeed);
                   } else {
-                    feedsBox.putAt(index,
-                        newFeed); // This will trigger the ValueListenableBuilder
+                    await provider.updateFeedWithExpense(index, newFeed);
                   }
 
-                  Navigator.pop(context);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Feed and expense saved successfully'),
+                      ),
+                    );
+                  }
                 } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                        content: Text('Error saving feed: ${e.toString()}')),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error saving data: ${e.toString()}'),
+                      ),
+                    );
+                  }
                 }
               }
             },
@@ -241,10 +263,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
     );
   }
 
-  Future<void> _deleteFeed(int index) async {
-    final feedToDelete = feedsBox.getAt(index);
-    if (feedToDelete == null) return;
-
+  Future<void> _deleteFeed(int index, Feed feedToDelete) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -252,7 +271,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text("This will permanently remove this feed record."),
+            const Text("This will also delete the associated expense record."),
             if (feedToDelete.quantity > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
@@ -270,10 +289,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text(
-              "Delete",
-              style: TextStyle(color: Colors.red),
-            ),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -281,17 +297,21 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
 
     if (confirmed == true) {
       try {
-        await feedsBox.deleteAt(index);
+        final provider =
+            Provider.of<FeedExpenseProvider>(context, listen: false);
+        await provider.deleteFeed(index);
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Feed deleted successfully')),
+            const SnackBar(
+                content: Text('Feed and expense deleted successfully')),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to delete feed: ${e.toString()}'),
+              content: Text('Failed to delete: ${e.toString()}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -303,220 +323,256 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              const Text('Loading feed data...'),
+              if (_initializationError) ...[
+                const SizedBox(height: 10),
+                ElevatedButton(
+                  onPressed: _initializeData,
+                  child: const Text('Retry Initialization'),
+                ),
+              ],
+            ],
+          ),
+        ),
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("🐷 PigCare Feeds"),
-        centerTitle: true,
-      ),
-      body: Column(
-        children: [
-          // In your ValueListenableBuilder for the summary card:
-          ValueListenableBuilder(
-            valueListenable: feedsBox.listenable(),
-            builder: (context, Box<Feed> box, _) {
-              double totalRemaining = 0;
-              int lowStockCount = 0;
+    if (_initializationError) {
+      return Scaffold(
+        appBar: AppBar(title: const Text("Feed Management")),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, size: 50, color: Colors.red),
+              const SizedBox(height: 20),
+              const Text('Failed to initialize database'),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _initializeData,
+                child: const Text('Try Again'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
-              for (final feed in box.values) {
-                totalRemaining += feed.remainingQuantity;
-                if (feed.remainingQuantity < lowStockThreshold) {
-                  lowStockCount++;
-                }
-              }
+    return Consumer<FeedExpenseProvider>(
+      builder: (context, provider, child) {
+        final feedsBox = provider.feedsBox;
 
-              return Card(
-                margin: const EdgeInsets.all(12),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text("🐷 PigCare Feeds"),
+            centerTitle: true,
+          ),
+          body: Column(
+            children: [
+              // Summary Card
+              ValueListenableBuilder(
+                valueListenable: feedsBox.listenable(),
+                builder: (context, Box<Feed> box, _) {
+                  double totalRemaining = 0;
+                  int lowStockCount = 0;
+
+                  for (final feed in box.values) {
+                    totalRemaining += feed.quantity;
+                    if (feed.quantity < lowStockThreshold) {
+                      lowStockCount++;
+                    }
+                  }
+
+                  return Card(
+                    margin: const EdgeInsets.all(12),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.inventory,
-                              color: Theme.of(context).primaryColor),
-                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              Icon(Icons.inventory,
+                                  color: Theme.of(context).primaryColor),
+                              const SizedBox(width: 8),
+                              Text(
+                                "Feed Inventory Summary",
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
                           Text(
-                            "Feed Inventory Summary",
-                            style: Theme.of(context).textTheme.titleMedium,
+                            "📦 Total Remaining: ${totalRemaining.toStringAsFixed(2)} kg",
+                            style: Theme.of(context).textTheme.bodyLarge,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            lowStockCount > 0
+                                ? "⚠️ $lowStockCount item(s) below $lowStockThreshold kg remaining"
+                                : "✅ Stock levels are good",
+                            style: TextStyle(
+                              color: lowStockCount > 0
+                                  ? Theme.of(context).colorScheme.error
+                                  : Colors.green,
+                            ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "📦 Total Remaining: ${totalRemaining.toStringAsFixed(2)} kg",
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        lowStockCount > 0
-                            ? "⚠️ $lowStockCount item(s) below $lowStockThreshold kg remaining"
-                            : "✅ Stock levels are good",
-                        style: TextStyle(
-                          color: lowStockCount > 0
-                              ? Theme.of(context).colorScheme.error
-                              : Colors.green,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-          // Action Buttons
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showFeedDialog(),
-                    icon: const Icon(Icons.add),
-                    label: const Text("Add Feed"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).primaryColor,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => AddFeedingScheduleScreen(),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.schedule),
-                    label: const Text("Schedule"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Feed Data Table
-          Expanded(
-            child: ValueListenableBuilder(
-              valueListenable: feedsBox.listenable(),
-              builder: (context, Box<Feed> box, _) {
-                if (box.isEmpty) {
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.inventory_2_outlined,
-                          size: 64,
-                          color: Theme.of(context).disabledColor,
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          "No feed records found",
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          "Add your first feed item to get started",
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
                     ),
                   );
-                }
+                },
+              ),
 
-                return SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: DataTable(
-                    columnSpacing: 24,
-                    columns: const [
-                      DataColumn(label: Text("Name")),
-                      DataColumn(label: Text("Brand")),
-                      DataColumn(label: Text("Supplier")),
-                      DataColumn(label: Text("Total Qty (kg)"), numeric: true),
-                      DataColumn(label: Text("Remaining (kg)"), numeric: true),
-                      DataColumn(label: Text("Price (₱)"), numeric: true),
-                      DataColumn(label: Text("Purchase Date")),
-                      DataColumn(label: Text("Actions")),
-                    ],
-                    rows: List.generate(box.length, (index) {
-                      final feed = box.getAt(index)!;
-                      final isLowStock = feed.remainingQuantity <
-                          lowStockThreshold; // Now checks remaining
-
-                      return DataRow(
-                        color: MaterialStateProperty.resolveWith<Color?>(
-                          (states) => isLowStock
-                              ? Colors.red[50]?.withOpacity(0.3)
-                              : null,
+              // Action Buttons
+              Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () => _showFeedDialog(),
+                        icon: const Icon(Icons.add),
+                        label: const Text("Add Feed"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Theme.of(context).primaryColor,
+                          foregroundColor: Colors.white,
                         ),
-                        cells: [
-                          DataCell(
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AddFeedingScheduleScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.schedule),
+                        label: const Text("Schedule"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Feed Data Table
+              Expanded(
+                child: ValueListenableBuilder(
+                  valueListenable: feedsBox.listenable(),
+                  builder: (context, Box<Feed> box, _) {
+                    if (box.isEmpty) {
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.inventory_2_outlined,
+                              size: 64,
+                              color: Theme.of(context).disabledColor,
+                            ),
+                            const SizedBox(height: 16),
                             Text(
-                              feed.name,
-                              style: TextStyle(
-                                fontWeight: isLowStock
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
+                              "No feed records found",
+                              style: Theme.of(context).textTheme.titleMedium,
                             ),
-                          ),
-                          DataCell(Text(feed.brand)),
-                          DataCell(Text(feed.supplier)),
-                          DataCell(Text(feed.quantity.toStringAsFixed(2))),
-                          DataCell(
+                            const SizedBox(height: 8),
                             Text(
-                              feed.remainingQuantity.toStringAsFixed(2),
-                              style: TextStyle(
-                                color: isLowStock ? Colors.red : null,
-                                fontWeight: isLowStock ? FontWeight.bold : null,
-                              ),
+                              "Add your first feed item to get started",
+                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
-                          ),
-                          DataCell(Text("₱${feed.price.toStringAsFixed(2)}")),
-                          DataCell(Text(DateFormat('MMM dd, yyyy')
-                              .format(feed.purchaseDate))),
-                          DataCell(
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  color: Colors.blue,
-                                  onPressed: () =>
-                                      _showFeedDialog(feed: feed, index: index),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete),
-                                  color: Colors.red,
-                                  onPressed: () => _deleteFeed(index),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       );
-                    }),
-                  ),
-                );
-              },
-            ),
+                    }
+
+                    return SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: DataTable(
+                        columnSpacing: 24,
+                        columns: const [
+                          DataColumn(label: Text("Name")),
+                          DataColumn(label: Text("Brand")),
+                          DataColumn(label: Text("Supplier")),
+                          DataColumn(
+                              label: Text("Quantity (kg)"), numeric: true),
+                          DataColumn(label: Text("Price (₱)"), numeric: true),
+                          DataColumn(label: Text("Purchase Date")),
+                          DataColumn(label: Text("Actions")),
+                        ],
+                        rows: List.generate(box.length, (index) {
+                          final feed = box.getAt(index)!;
+                          final isLowStock = feed.quantity < lowStockThreshold;
+
+                          return DataRow(
+                            color: MaterialStateProperty.resolveWith<Color?>(
+                              (states) => isLowStock
+                                  ? Colors.red[50]?.withOpacity(0.3)
+                                  : null,
+                            ),
+                            cells: [
+                              DataCell(
+                                Text(
+                                  feed.name,
+                                  style: TextStyle(
+                                    fontWeight: isLowStock
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
+                                ),
+                              ),
+                              DataCell(Text(feed.brand)),
+                              DataCell(Text(feed.supplier)),
+                              DataCell(Text(feed.quantity.toStringAsFixed(2))),
+                              DataCell(
+                                  Text("₱${feed.price.toStringAsFixed(2)}")),
+                              DataCell(Text(DateFormat('MMM dd, yyyy')
+                                  .format(feed.purchaseDate))),
+                              DataCell(
+                                Row(
+                                  children: [
+                                    IconButton(
+                                      icon: const Icon(Icons.edit),
+                                      color: Colors.blue,
+                                      onPressed: () => _showFeedDialog(
+                                          feed: feed, index: index),
+                                    ),
+                                    IconButton(
+                                      icon: const Icon(Icons.delete),
+                                      color: Colors.red,
+                                      onPressed: () => _deleteFeed(index, feed),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

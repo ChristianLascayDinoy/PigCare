@@ -1,52 +1,64 @@
+// models/expense_model.dart
 import 'package:hive/hive.dart';
 
 part 'expense_model.g.dart';
 
-@HiveType(typeId: 5) // Use a unique typeId (different from your Pig model)
+@HiveType(typeId: 5) // Make sure this ID is unique in your app
 class Expense {
   @HiveField(0)
   final String id;
 
   @HiveField(1)
-  final String category;
+  final String name;
 
   @HiveField(2)
   final double amount;
 
   @HiveField(3)
-  final DateTime date;
+  final String category;
 
   @HiveField(4)
-  final String description;
+  final DateTime date;
 
   @HiveField(5)
-  final String? pigTag; // Optional: link to specific pig
+  final List<String> pigTags;
+
+  @HiveField(6)
+  final String? description;
+
+  @HiveField(7)
+  final String? feedId;
 
   Expense({
     required this.id,
-    required this.category,
+    required this.name,
     required this.amount,
+    required this.category,
     required this.date,
-    required this.description,
-    this.pigTag,
+    required this.pigTags,
+    this.description,
+    this.feedId,
   });
 
-  // Helper method to create a copy with updated fields
   Expense copyWith({
     String? id,
-    String? category,
+    String? name,
     double? amount,
+    String? category,
     DateTime? date,
+    List<String>? pigTags,
     String? description,
-    String? pigTag,
+    String? feedId,
   }) {
     return Expense(
       id: id ?? this.id,
-      category: category ?? this.category,
+      name: name ?? this.name,
       amount: amount ?? this.amount,
+      category: category ?? this.category,
       date: date ?? this.date,
+      pigTags: pigTags ?? this.pigTags,
       description: description ?? this.description,
-      pigTag: pigTag ?? this.pigTag,
+      feedId: feedId ?? this.feedId,
     );
   }
 }

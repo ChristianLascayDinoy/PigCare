@@ -115,7 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         MaterialPageRoute(
                             builder: (context) => PigManagementScreen(
                                   pigpenIndex: 0,
-                                  allPigs: [],
+                                  allPigs: widget.allPigs,
                                   pig: Pig(
                                       tag: '',
                                       breed: '',
@@ -167,10 +167,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     title: "Expenses",
                     icon: Icons.attach_money,
                     onTap: () {
+                      final pigpenBox = Hive.box<Pigpen>('pigpens');
+                      final allPigs = pigpenBox.values
+                          .expand((pigpen) => pigpen.pigs)
+                          .toList();
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => ExpenseManagementScreen()),
+                          builder: (context) =>
+                              ExpenseManagementScreen(allPigs: allPigs),
+                        ),
                       );
                     },
                   ),
@@ -193,7 +200,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                            builder: (context) => ReportsScreen()),
+                            builder: (context) =>
+                                ReportsScreen(allPigs: widget.allPigs)),
                       );
                     },
                   ),

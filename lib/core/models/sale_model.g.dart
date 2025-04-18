@@ -19,10 +19,10 @@ class SaleAdapter extends TypeAdapter<Sale> {
     return Sale(
       id: fields[0] as String,
       pigTag: fields[1] as String,
-      amount: fields[2] as double,
-      date: fields[3] as DateTime,
-      buyer: fields[4] as String,
-      notes: fields[5] as String?,
+      buyerName: fields[2] as String,
+      amount: fields[3] as double,
+      date: fields[4] as DateTime,
+      description: fields[5] as String?,
     );
   }
 
@@ -35,13 +35,13 @@ class SaleAdapter extends TypeAdapter<Sale> {
       ..writeByte(1)
       ..write(obj.pigTag)
       ..writeByte(2)
-      ..write(obj.amount)
+      ..write(obj.buyerName)
       ..writeByte(3)
-      ..write(obj.date)
+      ..write(obj.amount)
       ..writeByte(4)
-      ..write(obj.buyer)
+      ..write(obj.date)
       ..writeByte(5)
-      ..write(obj.notes);
+      ..write(obj.description);
   }
 
   @override

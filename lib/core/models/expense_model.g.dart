@@ -18,30 +18,36 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
     };
     return Expense(
       id: fields[0] as String,
-      category: fields[1] as String,
+      name: fields[1] as String,
       amount: fields[2] as double,
-      date: fields[3] as DateTime,
-      description: fields[4] as String,
-      pigTag: fields[5] as String?,
+      category: fields[3] as String,
+      date: fields[4] as DateTime,
+      pigTags: (fields[5] as List).cast<String>(),
+      description: fields[6] as String?,
+      feedId: fields[7] as String?, // Added feedId field
     );
   }
 
   @override
   void write(BinaryWriter writer, Expense obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8) // Changed from 7 to 8 to account for new field
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.category)
+      ..write(obj.name)
       ..writeByte(2)
       ..write(obj.amount)
       ..writeByte(3)
-      ..write(obj.date)
+      ..write(obj.category)
       ..writeByte(4)
-      ..write(obj.description)
+      ..write(obj.date)
       ..writeByte(5)
-      ..write(obj.pigTag);
+      ..write(obj.pigTags)
+      ..writeByte(6)
+      ..write(obj.description)
+      ..writeByte(7)
+      ..write(obj.feedId); // Added feedId write
   }
 
   @override

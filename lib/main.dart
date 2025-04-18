@@ -4,6 +4,7 @@ import 'package:pigcare/core/models/task_model.dart';
 import 'package:pigcare/core/models/expense_model.dart';
 import 'package:pigcare/core/models/sale_model.dart';
 import 'package:pigcare/core/views/intro/loading_screen.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pigcare/core/models/feeding_schedule_model.dart';
 import 'package:pigcare/core/models/pig_model.dart';
@@ -11,6 +12,7 @@ import 'package:pigcare/core/models/pigpen_model.dart';
 import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/views/dashboard/dashboard_screen.dart';
 import 'package:pigcare/core/views/intro/intro_screen.dart';
+import 'package:pigcare/core/providers/feed_expense_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,8 +30,16 @@ void main() async {
     await _initializeAppData();
     await Hive.openBox('settings');
 
-    // Now run the actual app
-    runApp(const PigCareApp());
+    // Now run the actual app with the provider
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => FeedExpenseProvider()),
+          // Add other providers here if needed
+        ],
+        child: const PigCareApp(),
+      ),
+    );
   } catch (e) {
     runApp(_ErrorApp(error: e));
   }
