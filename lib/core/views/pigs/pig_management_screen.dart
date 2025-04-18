@@ -301,7 +301,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      pig.name ?? "Tag: ${pig.tag}",
+                      "Tag: ${pig.tag}",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,

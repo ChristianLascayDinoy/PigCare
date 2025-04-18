@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
+import 'package:pigcare/core/models/pigpen_model.dart';
 import '../../models/sale_model.dart';
 import '../../models/pig_model.dart';
-import '../../widgets/add_edit_sale_dialog.dart';
 
 class SalesManagementScreen extends StatefulWidget {
   final List<Pig> allPigs;
@@ -205,7 +205,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      pig.name ?? pig.tag,
+                      "Tag: ${pig.tag}",
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -213,7 +213,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
                     ),
                   ),
                   Text(
-                    NumberFormat.currency(symbol: '\$').format(sale.amount),
+                    NumberFormat.currency(symbol: '₱').format(sale.amount),
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -276,7 +276,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   Future<void> _showAddSaleDialog() async {
     final result = await showDialog<Sale>(
       context: context,
-      builder: (context) => AddEditSaleDialog(
+      builder: (context) => _AddEditSaleDialog(
         allPigs: widget.allPigs,
       ),
     );
@@ -289,7 +289,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   Future<void> _showEditSaleDialog(Sale sale) async {
     final result = await showDialog<Sale>(
       context: context,
-      builder: (context) => AddEditSaleDialog(
+      builder: (context) => _AddEditSaleDialog(
         allPigs: widget.allPigs,
         existingSale: sale,
       ),
@@ -302,11 +302,33 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
 
   Future<void> _saveSale(Sale sale) async {
     try {
+      // Save the sale
       await _salesBox.put(sale.id, sale);
+
+      // Remove the pig from pig management
+      await _removeSoldPig(sale.pigTag);
+
       await _loadSales();
-      _showSuccessSnackbar('Sale saved successfully');
+      _showSuccessSnackbar('Sale saved and pig removed successfully');
     } catch (e) {
       _showErrorSnackbar('Error saving sale: $e');
+    }
+  }
+
+  Future<void> _removeSoldPig(String pigTag) async {
+    try {
+      final pigpenBox = Hive.box<Pigpen>('pigpens');
+      final pigpens = pigpenBox.values.toList();
+
+      for (final pigpen in pigpens) {
+        if (pigpen.pigs.any((pig) => pig.tag == pigTag)) {
+          pigpen.pigs.removeWhere((pig) => pig.tag == pigTag);
+          await pigpen.save();
+          break;
+        }
+      }
+    } catch (e) {
+      _showErrorSnackbar('Error removing sold pig: $e');
     }
   }
 
@@ -314,16 +336,16 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text("Sale Details"),
+        title: const Text("Sale Details"),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildDetailRow('Pig', pig.name ?? pig.tag),
+              _buildDetailRow('Pig', pig.tag),
               _buildDetailRow('Buyer', sale.buyerName),
               _buildDetailRow('Amount',
-                  NumberFormat.currency(symbol: '\$').format(sale.amount)),
+                  NumberFormat.currency(symbol: '₱').format(sale.amount)),
               _buildDetailRow('Date', DateFormat.yMMMd().format(sale.date)),
               if (sale.description != null)
                 _buildDetailRow('Description', sale.description!),
@@ -381,5 +403,178 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     if (confirmed == true) {
       await _deleteSale(sale);
     }
+  }
+}
+
+class _AddEditSaleDialog extends StatefulWidget {
+  final List<Pig> allPigs;
+  final Sale? existingSale;
+
+  const _AddEditSaleDialog({
+    required this.allPigs,
+    this.existingSale,
+  });
+
+  @override
+  State<_AddEditSaleDialog> createState() => __AddEditSaleDialogState();
+}
+
+class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late TextEditingController _buyerNameController;
+  late TextEditingController _amountController;
+  late TextEditingController _descriptionController;
+  late DateTime _selectedDate;
+  late String? _selectedPigTag;
+
+  @override
+  void initState() {
+    super.initState();
+    _buyerNameController =
+        TextEditingController(text: widget.existingSale?.buyerName ?? '');
+    _amountController = TextEditingController(
+        text: widget.existingSale?.amount.toString() ?? '');
+    _descriptionController =
+        TextEditingController(text: widget.existingSale?.description ?? '');
+    _selectedDate = widget.existingSale?.date ?? DateTime.now();
+    _selectedPigTag = widget.existingSale?.pigTag;
+  }
+
+  @override
+  void dispose() {
+    _buyerNameController.dispose();
+    _amountController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.existingSale != null ? "Edit Sale" : "Add Sale"),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              DropdownButtonFormField<String>(
+                value: _selectedPigTag,
+                decoration: const InputDecoration(
+                  labelText: "Pig *",
+                  border: OutlineInputBorder(),
+                ),
+                items: widget.allPigs.map((pig) {
+                  return DropdownMenuItem(
+                    value: pig.tag,
+                    child: Text("Tag: ${pig.tag}"),
+                  );
+                }).toList(),
+                onChanged: (value) => setState(() => _selectedPigTag = value),
+                validator: (value) =>
+                    value == null ? 'Please select a pig' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _buyerNameController,
+                decoration: const InputDecoration(
+                  labelText: "Buyer Name *",
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) =>
+                    value?.isEmpty ?? true ? 'Required field' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _amountController,
+                decoration: const InputDecoration(
+                  labelText: "Amount *",
+                  border: OutlineInputBorder(),
+                  prefixText: '₱',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required field';
+                  }
+                  final amount = double.tryParse(value);
+                  if (amount == null || amount <= 0) {
+                    return 'Enter valid amount';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              InkWell(
+                onTap: () => _selectDate(context),
+                child: InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: "Date *",
+                    border: OutlineInputBorder(),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(DateFormat('MMM dd, yyyy').format(_selectedDate)),
+                      const Icon(Icons.calendar_today),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descriptionController,
+                decoration: const InputDecoration(
+                  labelText: "Description (Optional)",
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text("Cancel"),
+        ),
+        ElevatedButton(
+          onPressed: _saveSale,
+          child: const Text("Save"),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedDate) {
+      setState(() => _selectedDate = picked);
+    }
+  }
+
+  void _saveSale() {
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedPigTag == null) return;
+
+    final sale = Sale(
+      id: widget.existingSale?.id ??
+          DateTime.now().millisecondsSinceEpoch.toString(),
+      pigTag: _selectedPigTag!,
+      buyerName: _buyerNameController.text,
+      amount: double.parse(_amountController.text),
+      date: _selectedDate,
+      description: _descriptionController.text.isEmpty
+          ? null
+          : _descriptionController.text,
+    );
+
+    Navigator.pop(context, sale);
   }
 }
