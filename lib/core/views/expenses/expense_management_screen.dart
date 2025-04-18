@@ -746,13 +746,6 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
       appBar: AppBar(
         title: Text(
             widget.existingExpense != null ? "Edit Expense" : "Add Expense"),
-        actions: [
-          if (widget.existingExpense != null)
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _confirmDeleteExpense,
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -937,52 +930,5 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
     );
 
     Navigator.pop(context, expense);
-  }
-
-  Future<void> _confirmDeleteExpense() async {
-    if (widget.existingExpense == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: Text("Delete ${widget.existingExpense!.name} expense?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await widget.expensesBox.delete(widget.existingExpense!.id);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Expense successfully deleted'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          Navigator.pop(context, true);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error deleting expense: $e'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-          Navigator.pop(context, false);
-        }
-      }
-    }
   }
 }
