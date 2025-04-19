@@ -24,14 +24,14 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       date: fields[4] as DateTime,
       pigTags: (fields[5] as List).cast<String>(),
       description: fields[6] as String?,
-      feedId: fields[7] as String?, // Added feedId field
+      feedId: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Expense obj) {
     writer
-      ..writeByte(8) // Changed from 7 to 8 to account for new field
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -47,7 +47,7 @@ class ExpenseAdapter extends TypeAdapter<Expense> {
       ..writeByte(6)
       ..write(obj.description)
       ..writeByte(7)
-      ..write(obj.feedId); // Added feedId write
+      ..write(obj.feedId);
   }
 
   @override

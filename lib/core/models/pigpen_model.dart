@@ -14,27 +14,38 @@ class Pigpen extends HiveObject {
   @HiveField(2)
   List<Pig> pigs;
 
+  @HiveField(3) // Add new field
+  final int capacity;
+
   Pigpen({
     required this.name,
     required this.description,
     List<Pig>? pigs,
+    this.capacity = 0, // Default to 0 (unlimited)
   }) : pigs = pigs ?? [];
 
-  /// Creates a copy of the pigpen with new values
   Pigpen copyWith({
     String? name,
     String? description,
     List<Pig>? pigs,
+    int? capacity,
   }) {
     return Pigpen(
       name: name ?? this.name,
       description: description ?? this.description,
       pigs: pigs ?? List.from(this.pigs),
+      capacity: capacity ?? this.capacity,
     );
   }
 
-  /// Adds a pig to this pigpen and updates its reference
+  // Add this new method to check capacity
+  bool get isFull => capacity > 0 && pigs.length >= capacity;
+
+  // Update the addPig method to check capacity
   Future<void> addPig(Pig pig) async {
+    if (isFull) {
+      throw Exception('Pigpen is at full capacity ($capacity pigs)');
+    }
     if (containsPigWithTag(pig.tag)) {
       throw Exception('Pig with tag ${pig.tag} already exists in this pigpen');
     }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
+import 'package:pigcare/core/views/pigpens/pigpen_pigs_list_screen.dart';
 
 class PigpenManagementScreen extends StatefulWidget {
   const PigpenManagementScreen({super.key});
@@ -44,9 +45,10 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   Future<void> _showAddEditDialog({Pigpen? pigpen}) async {
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: pigpen?.name ?? '');
-    final descriptionController = TextEditingController(
-      text: pigpen?.description ?? '',
-    );
+    final descriptionController =
+        TextEditingController(text: pigpen?.description ?? '');
+    final capacityController =
+        TextEditingController(text: pigpen?.capacity.toString() ?? '0');
 
     await showDialog(
       context: context,
@@ -68,18 +70,32 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                   ),
                   validator: (value) {
                     final trimmedValue = value?.trim() ?? '';
-                    if (trimmedValue.isEmpty) {
-                      return 'Please enter a name';
-                    }
-                    if (trimmedValue.replaceAll(' ', '').isEmpty) {
+                    if (trimmedValue.isEmpty) return 'Please enter a name';
+                    if (trimmedValue.replaceAll(' ', '').isEmpty)
                       return 'Name cannot be just spaces';
-                    }
-                    if (trimmedValue.toLowerCase() == "unassigned") {
+                    if (trimmedValue.toLowerCase() == "unassigned")
                       return '"Unassigned" is a reserved name';
-                    }
                     if (_isNameDuplicate(trimmedValue, excludePigpen: pigpen)) {
                       return 'Pigpen name already exists';
                     }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: capacityController,
+                  decoration: const InputDecoration(
+                    labelText: "Capacity (0 for unlimited)",
+                    border: OutlineInputBorder(),
+                    hintText: "Enter maximum number of pigs",
+                  ),
+                  keyboardType: TextInputType.number,
+                  validator: (value) {
+                    if (value == null || value.isEmpty)
+                      return 'Please enter a number';
+                    final num = int.tryParse(value);
+                    if (num == null) return 'Please enter a valid number';
+                    if (num < 0) return 'Capacity cannot be negative';
                     return null;
                   },
                 ),
@@ -110,15 +126,13 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                 await _savePigpen(
                   pigpen: pigpen,
                   name: nameController.text,
+                  capacity: capacityController.text,
                   description: descriptionController.text,
                 );
                 if (mounted) Navigator.pop(context);
               }
             },
-            child: const Text(
-              "Save",
-              style: TextStyle(color: Colors.white),
-            ),
+            child: const Text("Save", style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -128,21 +142,24 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   Future<void> _savePigpen({
     required String name,
     required String description,
+    required String capacity,
     Pigpen? pigpen,
   }) async {
     try {
+      final capacityValue = int.tryParse(capacity) ?? 0;
+
       if (pigpen == null) {
-        // Create new pigpen
         final newPigpen = Pigpen(
           name: name,
           description: description,
+          capacity: capacityValue,
         );
         await _pigpenBox.add(newPigpen);
       } else {
-        // Update existing pigpen by putting the updated copy back with the same key
         final updated = pigpen.copyWith(
           name: name,
           description: description,
+          capacity: capacityValue,
         );
         await _pigpenBox.put(pigpen.key, updated);
       }
@@ -151,11 +168,9 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              pigpen == null
-                  ? "Pigpen added successfully"
-                  : "Pigpen updated successfully",
-            ),
+            content: Text(pigpen == null
+                ? "Pigpen added successfully"
+                : "Pigpen updated successfully"),
           ),
         );
       }
@@ -234,9 +249,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text("Pigpen deleted successfully"),
-          ),
+          const SnackBar(content: Text("Pigpen deleted successfully")),
         );
       }
     } catch (e) {
@@ -264,8 +277,8 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   List<Pigpen> _filterPigpens(List<Pigpen> pigpens) {
     if (_searchQuery.isEmpty) return pigpens;
     return pigpens.where((p) {
-      return p.name.toLowerCase().contains(_searchQuery) ||
-          p.description.toLowerCase().contains(_searchQuery);
+      return p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+          p.description.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
   }
 
@@ -362,6 +375,9 @@ class _PigpenCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isUnassigned = pigpen.name == "Unassigned";
+    final capacityText = pigpen.capacity == 0
+        ? 'Unlimited'
+        : '${pigpen.pigs.length}/${pigpen.capacity}';
 
     return Card(
       elevation: 2,
@@ -369,7 +385,12 @@ class _PigpenCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          // TODO: Navigate to pigpen details
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PigpenPigsListScreen(pigpen: pigpen),
+            ),
+          );
         },
         child: Padding(
           padding: const EdgeInsets.all(12.0),
@@ -394,13 +415,15 @@ class _PigpenCard extends StatelessWidget {
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green[100],
+                      color:
+                          pigpen.isFull ? Colors.red[100] : Colors.green[100],
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      "${pigpen.pigs.length}",
+                      capacityText,
                       style: TextStyle(
-                        color: Colors.green[800],
+                        color:
+                            pigpen.isFull ? Colors.red[800] : Colors.green[800],
                         fontWeight: FontWeight.bold,
                       ),
                     ),
