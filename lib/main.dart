@@ -3,6 +3,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/task_model.dart';
 import 'package:pigcare/core/models/expense_model.dart';
 import 'package:pigcare/core/models/sale_model.dart';
+import 'package:pigcare/core/services/notification_service.dart';
 import 'package:pigcare/core/views/intro/loading_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -29,6 +30,11 @@ void main() async {
     await _initializeHive();
     await _initializeAppData();
     await Hive.openBox('settings');
+
+    // Initialize notification service
+    final notificationService = NotificationService();
+    await notificationService.initialize();
+    await _rescheduleAllNotifications();
 
     // Now run the actual app with the provider
     runApp(
@@ -250,6 +256,30 @@ Future<void> _assignToUnassigned(
       imagePath: pigData['imagePath'],
     ),
   );
+}
+
+Future<void> _rescheduleAllNotifications() async {
+  try {
+    final notificationService = NotificationService();
+    final feedingScheduleBox = Hive.box<FeedingSchedule>('feedingSchedules');
+
+    for (final schedule in feedingScheduleBox.values) {
+      final timeParts = schedule.time.split(':');
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1].split(' ')[0]);
+
+      await notificationService.scheduleFeedingNotification(
+        id: schedule.notificationId,
+        title: 'Feeding Time for ${schedule.pigName}',
+        body:
+            'Feed ${schedule.quantity} kg of ${schedule.feedType} in ${schedule.pigpenId}',
+        time: TimeOfDay(hour: hour, minute: minute),
+        date: schedule.date,
+      );
+    }
+  } catch (e) {
+    debugPrint('Error rescheduling notifications: ${e.toString()}');
+  }
 }
 
 class PigCareApp extends StatelessWidget {
