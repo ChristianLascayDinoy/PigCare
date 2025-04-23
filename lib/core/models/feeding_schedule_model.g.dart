@@ -17,36 +17,39 @@ class FeedingScheduleAdapter extends TypeAdapter<FeedingSchedule> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return FeedingSchedule(
-      pigId: fields[0] as String,
-      pigName: fields[1] as String,
-      pigpenId: fields[2] as String,
-      feedType: fields[3] as String,
-      quantity: fields[4] as double,
-      time: fields[5] as String,
-      date: fields[6] as DateTime,
-      notificationId: fields[7] as int,
+      id: fields[0] as String?,
+      pigId: fields[1] as String,
+      pigName: fields[2] as String,
+      pigpenId: fields[3] as String,
+      feedType: fields[4] as String,
+      quantity: fields[5] as double,
+      time: fields[6] as String,
+      date: fields[7] as DateTime,
+      notificationId: fields[8] as int,
     );
   }
 
   @override
   void write(BinaryWriter writer, FeedingSchedule obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
-      ..write(obj.pigId)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.pigName)
+      ..write(obj.pigId)
       ..writeByte(2)
-      ..write(obj.pigpenId)
+      ..write(obj.pigName)
       ..writeByte(3)
-      ..write(obj.feedType)
+      ..write(obj.pigpenId)
       ..writeByte(4)
-      ..write(obj.quantity)
+      ..write(obj.feedType)
       ..writeByte(5)
-      ..write(obj.time)
+      ..write(obj.quantity)
       ..writeByte(6)
-      ..write(obj.date)
+      ..write(obj.time)
       ..writeByte(7)
+      ..write(obj.date)
+      ..writeByte(8)
       ..write(obj.notificationId);
   }
 

@@ -17,35 +17,38 @@ class FeedAdapter extends TypeAdapter<Feed> {
       for (int i = 0; i < numOfFields; i++) reader.readByte(): reader.read(),
     };
     return Feed(
-      name: fields[0] as String,
-      quantity: fields[1] as double,
-      price: fields[3] as double,
-      purchaseDate: fields[4] as DateTime,
-      supplier: fields[5] as String,
-      brand: fields[6] as String,
-      expenseId: fields[7] as String?,
-    )..remainingQuantity = fields[2] as double;
+      id: fields[0] as String?,
+      name: fields[1] as String,
+      quantity: fields[2] as double,
+      price: fields[4] as double,
+      purchaseDate: fields[5] as DateTime,
+      supplier: fields[6] as String,
+      brand: fields[7] as String,
+      expenseId: fields[8] as String?,
+    )..remainingQuantity = fields[3] as double;
   }
 
   @override
   void write(BinaryWriter writer, Feed obj) {
     writer
-      ..writeByte(8)
+      ..writeByte(9)
       ..writeByte(0)
-      ..write(obj.name)
+      ..write(obj.id)
       ..writeByte(1)
-      ..write(obj.quantity)
+      ..write(obj.name)
       ..writeByte(2)
-      ..write(obj.remainingQuantity)
+      ..write(obj.quantity)
       ..writeByte(3)
-      ..write(obj.price)
+      ..write(obj.remainingQuantity)
       ..writeByte(4)
-      ..write(obj.purchaseDate)
+      ..write(obj.price)
       ..writeByte(5)
-      ..write(obj.supplier)
+      ..write(obj.purchaseDate)
       ..writeByte(6)
-      ..write(obj.brand)
+      ..write(obj.supplier)
       ..writeByte(7)
+      ..write(obj.brand)
+      ..writeByte(8)
       ..write(obj.expenseId);
   }
 

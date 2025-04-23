@@ -1,34 +1,39 @@
 import 'package:hive/hive.dart';
+import 'package:uuid/uuid.dart';
 
 part 'feed_model.g.dart';
 
 @HiveType(typeId: 2)
 class Feed extends HiveObject {
   @HiveField(0)
-  String name;
+  final String id; // Unique identifier
 
   @HiveField(1)
-  double quantity; // Initial stock in kg
+  String name;
 
   @HiveField(2)
-  double remainingQuantity; // Tracks remaining feed
+  double quantity; // Initial stock in kg
 
   @HiveField(3)
-  double price; // Cost per kg
+  double remainingQuantity; // Tracks remaining feed
 
   @HiveField(4)
-  DateTime purchaseDate;
+  double price; // Cost per kg
 
   @HiveField(5)
-  String supplier; // New field for supplier/store name
+  DateTime purchaseDate;
 
   @HiveField(6)
-  String brand; // New field for feed
+  String supplier; // New field for supplier/store name
 
   @HiveField(7)
+  String brand; // New field for feed
+
+  @HiveField(8)
   String? expenseId;
 
   Feed({
+    String? id,
     required this.name,
     required this.quantity,
     required this.price,
@@ -36,9 +41,11 @@ class Feed extends HiveObject {
     required this.supplier,
     required this.brand,
     this.expenseId,
-  }) : remainingQuantity = quantity; // Initialize remaining stock
+  })  : id = id ?? const Uuid().v4(),
+        remainingQuantity = quantity; // Initialize remaining stock
 
   Feed copyWith({
+    String? id,
     String? name,
     double? quantity,
     double? price,
@@ -48,6 +55,7 @@ class Feed extends HiveObject {
     String? expenseId,
   }) {
     return Feed(
+      id: id ?? this.id,
       name: name ?? this.name,
       quantity: quantity ?? this.quantity,
       price: price ?? this.price,

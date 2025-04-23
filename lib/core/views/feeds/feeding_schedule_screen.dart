@@ -117,13 +117,13 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
 
       // Save all schedules to Hive
       for (final schedule in schedules) {
-        await feedingScheduleBox.add(schedule);
+        await feedingScheduleBox.put(schedule.id, schedule); // Save using ID
         await schedule.scheduleNotification();
       }
 
       // Update feed quantity
       selectedFeed!.deductFeed(totalRequired);
-      await feedBox.put(selectedFeed!.key, selectedFeed!);
+      await feedBox.put(selectedFeed!.id, selectedFeed!); // Save using ID
 
       _resetForm();
       _showSuccess('Schedule saved for ${pigsToFeed.length} pigs!');
@@ -186,6 +186,7 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
       try {
         await schedule.delete();
         _showSuccess('Schedule deleted successfully');
+        setState(() {}); // Refresh the UI
       } catch (e) {
         _showError('Error deleting schedule: ${e.toString()}');
       }

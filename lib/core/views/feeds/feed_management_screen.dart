@@ -54,7 +54,8 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
     }
   }
 
-  void _showFeedDialog({Feed? feed, int? index}) {
+  void _showFeedDialog({Feed? feed}) {
+    // Removed index parameter
     final formKey = GlobalKey<FormState>();
     final nameController = TextEditingController(text: feed?.name ?? '');
     final quantityController =
@@ -223,6 +224,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                   final provider =
                       Provider.of<FeedExpenseProvider>(context, listen: false);
                   final newFeed = Feed(
+                    id: feed?.id, // Preserve existing ID if editing
                     name: nameController.text.trim(),
                     quantity: double.parse(quantityController.text),
                     price: double.parse(priceController.text),
@@ -231,10 +233,10 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     brand: brandController.text.trim(),
                   );
 
-                  if (index == null) {
+                  if (feed == null) {
                     await provider.addFeedWithExpense(newFeed);
                   } else {
-                    await provider.updateFeedWithExpense(index, newFeed);
+                    await provider.updateFeedWithExpense(newFeed);
                   }
 
                   if (mounted) {
@@ -263,7 +265,8 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
     );
   }
 
-  Future<void> _deleteFeed(int index, Feed feedToDelete) async {
+  Future<void> _deleteFeed(Feed feedToDelete) async {
+    // Removed index parameter
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -299,7 +302,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
       try {
         final provider =
             Provider.of<FeedExpenseProvider>(context, listen: false);
-        await provider.deleteFeed(index);
+        await provider.deleteFeed(feedToDelete);
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -550,13 +553,13 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                                     IconButton(
                                       icon: const Icon(Icons.edit),
                                       color: Colors.blue,
-                                      onPressed: () => _showFeedDialog(
-                                          feed: feed, index: index),
+                                      onPressed: () =>
+                                          _showFeedDialog(feed: feed),
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.delete),
                                       color: Colors.red,
-                                      onPressed: () => _deleteFeed(index, feed),
+                                      onPressed: () => _deleteFeed(feed),
                                     ),
                                   ],
                                 ),

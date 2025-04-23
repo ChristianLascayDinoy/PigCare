@@ -157,7 +157,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<Map<String, dynamic>> _calculateFeedReports() async {
-    final feedsBox = await Hive.openBox<Feed>('feeds');
+    final feedsBox = await Hive.openBox<Feed>('feedsBox'); // Updated box name
     final expensesBox = await Hive.openBox<Expense>('expenses');
 
     final allFeeds = feedsBox.values.toList();
@@ -199,6 +199,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'consumed': 0.0,
           'percentage': 0.0,
           'brands': <String, int>{},
+          'suppliers': <String, int>{},
         };
       }
       feedTypes[feed.name]!['quantity'] =
@@ -215,6 +216,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
         feedTypes[feed.name]!['brands'][feed.brand] = 0;
       }
       feedTypes[feed.name]!['brands'][feed.brand] += 1;
+
+      // Track suppliers
+      if (!feedTypes[feed.name]!['suppliers'].containsKey(feed.supplier)) {
+        feedTypes[feed.name]!['suppliers'][feed.supplier] = 0;
+      }
+      feedTypes[feed.name]!['suppliers'][feed.supplier] += 1;
     }
 
     // Calculate percentages based on remaining quantity
@@ -239,6 +246,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'averageCostPerKg': totalFeedCost > 0 && consumption > 0
           ? totalFeedCost / consumption
           : 0,
+      'totalFeedPurchases': allFeeds
+          .where((f) =>
+              f.purchaseDate.isAfter(_dateRange.start) &&
+              f.purchaseDate.isBefore(_dateRange.end))
+          .length,
     };
   }
 
@@ -697,6 +709,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
           "Low Stock Items",
           "${data['lowStockItems'] ?? 0} items",
         ),
+        _buildReportItem(
+          "Total Purchases",
+          "${data['totalFeedPurchases'] ?? 0} purchases",
+        ),
         if (data['feedTypes'] != null && data['feedTypes'].isNotEmpty) ...[
           const SizedBox(height: 16),
           const Text(
@@ -780,6 +796,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                         const SizedBox(height: 4),
                         Text(
                           "Brands: ${(value['brands'] as Map).keys.join(', ')}",
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      ],
+                      if (value['suppliers'] != null &&
+                          (value['suppliers'] as Map).isNotEmpty) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          "Suppliers: ${(value['suppliers'] as Map).keys.join(', ')}",
                           style: const TextStyle(fontSize: 12),
                         ),
                       ],
