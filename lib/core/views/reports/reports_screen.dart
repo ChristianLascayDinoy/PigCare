@@ -1,14 +1,18 @@
-import 'dart:typed_data';
+import 'dart:io';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:hive/hive.dart';
 import 'package:fl_chart/fl_chart.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:pigcare/core/models/feed_model.dart';
 import '../../models/pig_model.dart';
 import '../../models/expense_model.dart';
 import '../../models/sale_model.dart';
 import '../../models/task_model.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class ReportsScreen extends StatefulWidget {
   final List<Pig> allPigs;
@@ -38,6 +42,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, dynamic> taskReports = {};
   Map<String, dynamic> expenseReports = {};
   Map<String, dynamic> salesReports = {};
+  Map<String, dynamic> financialSummary = {};
 
   @override
   void initState() {
@@ -73,6 +78,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _calculateTaskReports(),
         _calculateExpenseReports(),
         _calculateSalesReports(),
+        _calculateFinancialSummary(), // Add this line
       ]);
 
       setState(() {
@@ -81,6 +87,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         taskReports = results[2];
         expenseReports = results[3];
         salesReports = results[4];
+        financialSummary = results[5]; // Add this line
       });
     } catch (e) {
       if (mounted) {
@@ -275,6 +282,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
     };
   }
 
+  Future<Map<String, dynamic>> _calculateFinancialSummary() async {
+    final sales = _salesBox.values
+        .where((s) =>
+            s.date.isAfter(_dateRange.start) && s.date.isBefore(_dateRange.end))
+        .toList();
+
+    final expenses = _expensesBox.values
+        .where((e) =>
+            e.date.isAfter(_dateRange.start) && e.date.isBefore(_dateRange.end))
+        .toList();
+
+    final totalSales = sales.fold(0.0, (sum, s) => sum + s.amount);
+    final totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final netProfit = totalSales - totalExpenses;
+
+    return {
+      'totalSales': totalSales,
+      'totalExpenses': totalExpenses,
+      'netProfit': netProfit,
+      'profitMargin': totalSales > 0 ? (netProfit / totalSales) * 100 : 0,
+    };
+  }
+
   Future<Map<String, dynamic>> _calculateExpenseReports() async {
     final expenses = _expensesBox.values
         .where((e) =>
@@ -360,24 +390,77 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _exportReports() async {
     try {
-      final dateFormat = DateFormat('yyyyMMdd');
-      final fileName = 'reports_${dateFormat.format(DateTime.now())}.csv';
+      // Create a PDF document
+      final pdf = pw.Document();
 
-      final csvData = StringBuffer()
-        ..writeln('Report Type,Category,Value')
-        ..writeAll(_convertToCsvRows(), '\n');
+      // Add a page to the PDF
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) => [
+            // Header
+            pw.Header(
+              level: 0,
+              child: pw.Text('Farm Reports',
+                  style: pw.TextStyle(
+                    fontSize: 24,
+                    fontWeight: pw.FontWeight.bold,
+                  )),
+            ),
+            pw.Text(
+                'Date Range: ${DateFormat('MMM dd, yyyy').format(_dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(_dateRange.end)}'),
+            pw.SizedBox(height: 20),
 
-      final result = await FileSaver.instance.saveFile(
-        name: fileName,
-        bytes: Uint8List.fromList(csvData.toString().codeUnits),
-        ext: 'csv',
-        mimeType: MimeType.csv,
+            // Pig Report Section
+            _buildPdfReportSection('Pig Report', _buildPigReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            // Financial Summary Section
+            _buildPdfReportSection(
+                'Financial Summary', _buildFinancialSummaryPdfContent()),
+            pw.SizedBox(height: 20),
+
+            // Feed Report Section
+            _buildPdfReportSection('Feed Report', _buildFeedReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            // Task Report Section
+            _buildPdfReportSection('Task Report', _buildTaskReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            // Expense Report Section
+            _buildPdfReportSection(
+                'Expense Report', _buildExpenseReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            // Sales Report Section
+            _buildPdfReportSection(
+                'Sales Report', _buildSalesReportPdfContent()),
+          ],
+        ),
       );
 
-      if (mounted && result != null) {
+      // Request storage permission
+      if (await Permission.storage.request().isGranted) {
+        final downloadsDirectory = Directory('/storage/emulated/0/Download');
+        final file = File('${downloadsDirectory.path}/farm_report.pdf');
+        await file.writeAsBytes(await pdf.save());
+        print('PDF saved to Downloads: ${file.path}');
+      } else {
+        print('Permission denied');
+      }
+
+      // Share/save the PDF
+      await Printing.sharePdf(
+        bytes: await pdf.save(),
+        filename:
+            'farm_report_${DateFormat('yyyyMMdd').format(DateTime.now())}.pdf',
+      );
+
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Report exported successfully'),
+            content: Text('PDF report exported successfully'),
             duration: Duration(seconds: 2),
           ),
         );
@@ -386,48 +469,247 @@ class _ReportsScreenState extends State<ReportsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error exporting report: $e'),
-            duration: Duration(seconds: 2),
+            content: Text('Error exporting PDF report: $e'),
+            duration: const Duration(seconds: 2),
           ),
         );
       }
     }
   }
 
-  List<String> _convertToCsvRows() {
-    final rows = <String>[];
-    final currencyFormat = NumberFormat.currency(symbol: '\$');
+// =====================
+// PDF Helper Methods
+// =====================
 
-    // Pig Reports
-    rows.add('Pig Report,Total Pigs,${pigReports['totalPigs'] ?? 0}');
-    rows.add('Pig Report,Male Pigs,${pigReports['byGender']?['male'] ?? 0}');
-    rows.add(
-        'Pig Report,Female Pigs,${pigReports['byGender']?['female'] ?? 0}');
+  pw.Widget _buildPdfReportSection(String title, pw.Widget content) {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        pw.Text(title,
+            style: pw.TextStyle(
+              fontSize: 18,
+              fontWeight: pw.FontWeight.bold,
+            )),
+        pw.Divider(),
+        content,
+      ],
+    );
+  }
 
-    // Expense Reports
-    if (expenseReports.isNotEmpty) {
-      rows.add(
-          'Expense Report,Total Expenses,${currencyFormat.format(expenseReports['total'] ?? 0)}');
-      for (final entry in (expenseReports['byCategory']?.entries ??
-          <MapEntry<String, dynamic>>[])) {
-        rows.add(
-            'Expense Report,${entry.key},${currencyFormat.format(entry.value)}');
-      }
-    }
+  pw.Widget _buildPigReportPdfContent() {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem('Total Pigs', pigReports['totalPigs'].toString()),
+        _buildPdfReportItem(
+            'Male Pigs', pigReports['byGender']['male'].toString()),
+        _buildPdfReportItem(
+            'Female Pigs', pigReports['byGender']['female'].toString()),
+        pw.SizedBox(height: 10),
+        pw.Text('By Stage:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        _buildPdfReportItem(
+            'Piglets', pigReports['byStage']['piglet'].toString()),
+        _buildPdfReportItem(
+            'Weaners', pigReports['byStage']['weaner'].toString()),
+        _buildPdfReportItem(
+            'Growers', pigReports['byStage']['grower'].toString()),
+        _buildPdfReportItem(
+            'Finishers', pigReports['byStage']['finisher'].toString()),
+        _buildPdfReportItem('Sows', pigReports['byStage']['sow'].toString()),
+        _buildPdfReportItem('Boars', pigReports['byStage']['boar'].toString()),
+        pw.SizedBox(height: 10),
+        pw.Text('By Age Group:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        _buildPdfReportItem(
+            '0-3 months', pigReports['byAge']['0-3 months'].toString()),
+        _buildPdfReportItem(
+            '3-6 months', pigReports['byAge']['3-6 months'].toString()),
+        _buildPdfReportItem(
+            '6-12 months', pigReports['byAge']['6-12 months'].toString()),
+        _buildPdfReportItem(
+            '1-2 years', pigReports['byAge']['1-2 years'].toString()),
+        _buildPdfReportItem(
+            '2+ years', pigReports['byAge']['2+ years'].toString()),
+        _buildPdfReportItem('Average Age',
+            '${pigReports['averageAge'].toStringAsFixed(1)} months'),
+      ],
+    );
+  }
 
-    // Sales Reports
-    if (salesReports.isNotEmpty) {
-      rows.add(
-          'Sales Report,Total Sales,${currencyFormat.format(salesReports['total'] ?? 0)}');
-      rows.add('Sales Report,Number of Sales,${salesReports['count'] ?? 0}');
-      for (final entry in (salesReports['byPigType']?.entries ??
-          <MapEntry<String, dynamic>>[])) {
-        rows.add(
-            'Sales Report,${entry.key},${entry.value['count']} sales (${currencyFormat.format(entry.value['total'])})');
-      }
-    }
+  pw.Widget _buildFinancialSummaryPdfContent() {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem('Total Sales',
+            currencyFormat.format(financialSummary['totalSales'])),
+        _buildPdfReportItem('Total Expenses',
+            currencyFormat.format(financialSummary['totalExpenses'])),
+        _buildPdfReportItem(
+          'Net Profit',
+          currencyFormat.format(financialSummary['netProfit']),
+          isPositive: financialSummary['netProfit'] >= 0,
+        ),
+        _buildPdfReportItem(
+          'Profit Margin',
+          '${financialSummary['profitMargin'].toStringAsFixed(2)}%',
+          isPositive: financialSummary['profitMargin'] >= 0,
+        ),
+      ],
+    );
+  }
 
-    return rows;
+  pw.Widget _buildFeedReportPdfContent() {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem('Total Feed Cost',
+            currencyFormat.format(feedReports['totalFeedCost'] ?? 0)),
+        _buildPdfReportItem('Current Inventory',
+            '${feedReports['currentInventory']?.toStringAsFixed(2) ?? '0'} kg'),
+        _buildPdfReportItem('Feed Consumed',
+            '${feedReports['feedConsumption']?.toStringAsFixed(2) ?? '0'} kg'),
+        _buildPdfReportItem(
+          'Avg Cost/Kg',
+          feedReports['averageCostPerKg'] != null
+              ? '${currencyFormat.format(feedReports['averageCostPerKg'])}/kg'
+              : 'N/A',
+        ),
+        _buildPdfReportItem(
+            'Low Stock Items', '${feedReports['lowStockItems'] ?? 0} items'),
+        _buildPdfReportItem('Total Purchases',
+            '${feedReports['totalFeedPurchases'] ?? 0} purchases'),
+        if (feedReports['feedTypes'] != null &&
+            feedReports['feedTypes'].isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          pw.Text('Feed Types:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          ...feedReports['feedTypes'].entries.map((entry) {
+            final value = entry.value as Map<String, dynamic>;
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(entry.key,
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                _buildPdfReportItem('Purchased',
+                    '${(value['quantity'] as num).toStringAsFixed(2)} kg'),
+                _buildPdfReportItem('Consumed',
+                    '${(value['consumed'] as num).toStringAsFixed(2)} kg'),
+                _buildPdfReportItem(
+                  'Remaining',
+                  '${(value['remaining'] as num).toStringAsFixed(2)} kg (${(value['percentage'] as num).toStringAsFixed(1)}%)',
+                  isPositive: (value['remaining'] as num).toDouble() >= 10,
+                ),
+                pw.SizedBox(height: 5),
+              ],
+            );
+          }).toList(),
+        ],
+      ],
+    );
+  }
+
+  pw.Widget _buildTaskReportPdfContent() {
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem(
+            'Total Events', taskReports['totalEvents'].toString()),
+        _buildPdfReportItem(
+          'Completion Rate',
+          '${(taskReports['completionRate'] * 100).toStringAsFixed(1)}%',
+          isPositive: taskReports['completionRate'] >= 0.7,
+        ),
+        pw.SizedBox(height: 10),
+        pw.Text('By Type:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        _buildPdfReportItem(
+            'Health', taskReports['byType']['health'].toString()),
+        _buildPdfReportItem(
+            'Breeding', taskReports['byType']['breeding'].toString()),
+        _buildPdfReportItem(
+            'Feeding', taskReports['byType']['feeding'].toString()),
+        _buildPdfReportItem(
+            'Movement', taskReports['byType']['movement'].toString()),
+        _buildPdfReportItem('Other', taskReports['byType']['other'].toString()),
+      ],
+    );
+  }
+
+  pw.Widget _buildExpenseReportPdfContent() {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem('Total Expenses',
+            currencyFormat.format(expenseReports['total'] ?? 0)),
+        _buildPdfReportItem('Average Expense',
+            currencyFormat.format(expenseReports['average'] ?? 0)),
+        if (expenseReports['byCategory'] != null &&
+            expenseReports['byCategory'].isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          pw.Text('By Category:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          ...expenseReports['byCategory'].entries.map((entry) {
+            return _buildPdfReportItem(
+              entry.key,
+              currencyFormat.format(entry.value),
+            );
+          }).toList(),
+        ],
+      ],
+    );
+  }
+
+  pw.Widget _buildSalesReportPdfContent() {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem(
+            'Total Sales', currencyFormat.format(salesReports['total'])),
+        _buildPdfReportItem(
+            'Number of Sales', salesReports['count'].toString()),
+        _buildPdfReportItem(
+            'Average Sale', currencyFormat.format(salesReports['average'])),
+        if (salesReports['byPigType'].isNotEmpty) ...[
+          pw.SizedBox(height: 10),
+          pw.Text('By Pig Type:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          ...salesReports['byPigType'].entries.map((entry) {
+            return _buildPdfReportItem(
+              entry.key,
+              '${entry.value['count']} sales (${currencyFormat.format(entry.value['total'])})',
+            );
+          }).toList(),
+        ],
+      ],
+    );
+  }
+
+  pw.Widget _buildPdfReportItem(String label, String value,
+      {bool? isPositive}) {
+    return pw.Padding(
+      padding: const pw.EdgeInsets.symmetric(vertical: 4),
+      child: pw.Row(
+        children: [
+          pw.Expanded(
+            child: pw.Text(label),
+          ),
+          pw.Text(
+            value,
+            style: pw.TextStyle(
+              fontWeight: pw.FontWeight.bold,
+              color: isPositive != null
+                  ? (isPositive ? PdfColors.green : PdfColors.red)
+                  : PdfColors.black,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -494,6 +776,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       data: salesReports,
                       buildContent: _buildSalesReportContent,
                     ),
+                    const SizedBox(height: 16),
+                    _buildFinancialSummaryCard(), // Add this new card
                   ],
                 ),
               ),
@@ -827,7 +1111,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildReportItem("Total Events", data['totalEvents'].toString()),
+        _buildReportItem("Total Tasks", data['totalEvents'].toString()),
         _buildReportItem("Completion Rate",
             "${(data['completionRate'] * 100).toStringAsFixed(1)}%"),
         const SizedBox(height: 12),
@@ -918,7 +1202,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         barRods: [
           BarChartRodData(
             toY: (byCategory[categories[index]] ?? 0).toDouble(),
-            color: Colors.green,
+            color: Colors.red,
             width: 16,
           ),
         ],
@@ -948,6 +1232,181 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ),
         ],
       ],
+    );
+  }
+
+  Widget _buildFinancialSummaryCard() {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.attach_money, size: 28, color: Colors.green[700]),
+                const SizedBox(width: 12),
+                const Text(
+                  "Financial Summary",
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const Divider(height: 24, thickness: 1),
+            if (financialSummary.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text('No financial data available for this period',
+                    style: TextStyle(color: Colors.grey)),
+              )
+            else ...[
+              _buildFinancialComparisonChart(),
+              const SizedBox(height: 16),
+              _buildReportItem(
+                "Total Sales",
+                NumberFormat.currency(symbol: '₱')
+                    .format(financialSummary['totalSales']),
+              ),
+              _buildReportItem(
+                "Total Expenses",
+                NumberFormat.currency(symbol: '₱')
+                    .format(financialSummary['totalExpenses']),
+              ),
+              _buildReportItem(
+                "Net Profit",
+                NumberFormat.currency(symbol: '₱')
+                    .format(financialSummary['netProfit']),
+                tooltip: 'Sales minus Expenses',
+              ),
+              _buildReportItem(
+                "Profit Margin",
+                "${financialSummary['profitMargin'].toStringAsFixed(2)}%",
+                tooltip: 'Net Profit as percentage of Sales',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFinancialComparisonChart() {
+    final currencyFormat = NumberFormat.compactCurrency(symbol: '₱');
+    final maxValue = max(
+      financialSummary['totalSales'] as num,
+      financialSummary['totalExpenses'] as num,
+    ).toDouble();
+
+    return SizedBox(
+      height: 200,
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: maxValue * 1.2, // Add 20% padding
+          barGroups: [
+            BarChartGroupData(
+              x: 0,
+              barRods: [
+                BarChartRodData(
+                  toY: financialSummary['totalSales'],
+                  color: Colors.green,
+                  width: 20,
+                  borderRadius: BorderRadius.zero,
+                ),
+              ],
+              showingTooltipIndicators: [0],
+            ),
+            BarChartGroupData(
+              x: 1,
+              barRods: [
+                BarChartRodData(
+                  toY: financialSummary['totalExpenses'],
+                  color: Colors.red,
+                  width: 20,
+                  borderRadius: BorderRadius.zero,
+                ),
+              ],
+              showingTooltipIndicators: [0],
+            ),
+            BarChartGroupData(
+              x: 2,
+              barRods: [
+                BarChartRodData(
+                  toY: financialSummary['netProfit'].abs(),
+                  color: financialSummary['netProfit'] >= 0
+                      ? Colors.blue
+                      : Colors.orange,
+                  width: 20,
+                  borderRadius: BorderRadius.zero,
+                ),
+              ],
+              showingTooltipIndicators: [0],
+            ),
+          ],
+          titlesData: FlTitlesData(
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  switch (value.toInt()) {
+                    case 0:
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('Sales'),
+                      );
+                    case 1:
+                      return const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('Expenses'),
+                      );
+                    case 2:
+                      return Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          financialSummary['netProfit'] >= 0
+                              ? 'Profit'
+                              : 'Loss',
+                        ),
+                      );
+                    default:
+                      return const Text('');
+                  }
+                },
+              ),
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Text(
+                      currencyFormat.format(value),
+                      style: const TextStyle(fontSize: 10),
+                    ),
+                  );
+                },
+                reservedSize: 50,
+              ),
+            ),
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+          ),
+          gridData: const FlGridData(show: true),
+          borderData: FlBorderData(show: true),
+        ),
+      ),
     );
   }
 
