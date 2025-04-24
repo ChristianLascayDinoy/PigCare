@@ -38,17 +38,32 @@ class Pigpen extends HiveObject {
     );
   }
 
+  int get remainingCapacity {
+    return capacity == 0 ? -1 : capacity - pigs.length; // -1 means unlimited
+  }
+
+  String get capacityStatus {
+    if (capacity == 0) return 'Unlimited';
+    return '$remainingCapacity of $capacity available';
+  }
+
   // Add this new method to check capacity
-  bool get isFull => capacity > 0 && pigs.length >= capacity;
+  bool get isFull {
+    // Capacity 0 means unlimited capacity
+    if (capacity == 0) return false;
+    return pigs.length >= capacity;
+  }
 
   // Update the addPig method to check capacity
   Future<void> addPig(Pig pig) async {
     if (isFull) {
-      throw Exception('Pigpen is at full capacity ($capacity pigs)');
+      throw Exception(
+          'Cannot add pig - $name is at full capacity ($capacity pigs)');
     }
     if (containsPigWithTag(pig.tag)) {
       throw Exception('Pig with tag ${pig.tag} already exists in this pigpen');
     }
+
     pigs.add(pig);
     pig.pigpenKey = key;
     await pig.save();
@@ -65,8 +80,19 @@ class Pigpen extends HiveObject {
     await save();
   }
 
+  @override
+  Future<void> delete() async {
+    final box = Hive.box<Pigpen>('pigpens');
+    await box.delete(key);
+  }
+
   /// Transfers pigs from another pigpen to this one
   Future<void> transferPigs(List<Pig> pigsToTransfer) async {
+    if (capacity > 0 && pigs.length + pigsToTransfer.length > capacity) {
+      throw Exception(
+          'Cannot transfer ${pigsToTransfer.length} pigs - $name would exceed capacity ($capacity)');
+    }
+
     final box = Hive.box<Pigpen>('pigpens');
 
     for (final pig in pigsToTransfer) {
@@ -80,9 +106,13 @@ class Pigpen extends HiveObject {
 
       // Add to this pigpen if not already present
       if (!containsPigWithTag(pig.tag)) {
-        await addPig(pig);
+        pigs.add(pig);
+        pig.pigpenKey = key;
+        await pig.save();
       }
     }
+
+    await save();
   }
 
   /// Gets the count of pigs in this pen

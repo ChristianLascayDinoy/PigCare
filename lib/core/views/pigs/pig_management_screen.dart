@@ -123,7 +123,6 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
 
       Pigpen targetPigpen;
       if (newPig.pigpenKey == null) {
-        // Handle unassigned case explicitly
         targetPigpen = _allPigpens.firstWhere(
           (p) => p.name == "Unassigned",
           orElse: () {
@@ -148,18 +147,33 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
         );
       }
 
+      // Only check capacity if we're adding a new pig (not editing)
+      if (existingPig == null && targetPigpen.isFull) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('${targetPigpen.name} is already full'),
+            backgroundColor: Colors.red,
+          ));
+        }
+        return;
+      }
+
       targetPigpen.pigs.add(newPig);
       await targetPigpen.save();
 
       _loadAllData();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Pig saved successfully')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Pig saved successfully'),
+          backgroundColor: Colors.green,
+        ));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error saving pig: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Error saving pig: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ));
       }
     }
   }
@@ -198,13 +212,17 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
         await _removePigFromPigpen(pig);
         _loadAllData();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Pig deleted successfully')));
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Pig deleted successfully'),
+            backgroundColor: Colors.red,
+          ));
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error deleting pig: ${e.toString()}')));
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Error deleting pig: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ));
         }
       }
     }
@@ -601,22 +619,28 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
       children: [
         TextFormField(
           controller: _controllers['tag'],
+          keyboardType: TextInputType.number, // Shows numeric keyboard
           inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly, // Only allows digits
             FilteringTextInputFormatter.deny(
-                RegExp(r'^\s')), // No leading space
-            FilteringTextInputFormatter.deny(
-                RegExp(r'\s{2,}')), // No multiple spaces
+                RegExp(r'^0')), // Optional: Prevent leading zero
+            LengthLimitingTextInputFormatter(10), // Optional: Limit length
           ],
           decoration: const InputDecoration(
             labelText: "Tag Number *",
             border: OutlineInputBorder(),
+            hintText: "Enter numbers only",
           ),
           readOnly: widget.existingPig != null,
           validator: (value) {
             final trimmedValue = value?.trim() ?? '';
             if (trimmedValue.isEmpty) return 'Required field';
-            if (trimmedValue.replaceAll(' ', '').isEmpty) {
-              return 'Tag cannot be just spaces';
+            if (!RegExp(r'^[0-9]+$').hasMatch(trimmedValue)) {
+              return 'Only numbers are allowed';
+            }
+            if (trimmedValue.length < 3) {
+              // Optional: Minimum length
+              return 'Tag must be at least 3 digits';
             }
 
             // Check against all existing tags (trimmed)
@@ -665,15 +689,37 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
         ...widget.allPigpens
             .where((p) => p.name != "Unassigned")
             .map<DropdownMenuItem<int?>>((pigpen) {
+          // Only disable if it's not the current pigpen
+          final isCurrentPigpen = pigpen.key == _dropdownValues['pigpenKey'];
           return DropdownMenuItem<int?>(
             value: pigpen.key,
-            child: Text(pigpen.name),
+            enabled: !pigpen.isFull || isCurrentPigpen,
+            child: Text(
+              pigpen.isFull && !isCurrentPigpen
+                  ? '${pigpen.name} (FULL)'
+                  : '${pigpen.name} (${pigpen.pigs.length}/${pigpen.capacity})',
+              style: TextStyle(
+                color: pigpen.isFull && !isCurrentPigpen ? Colors.grey : null,
+              ),
+            ),
           );
         }).toList(),
       ],
       onChanged: (value) => setState(() {
         _dropdownValues['pigpenKey'] = value;
       }),
+      validator: (value) {
+        if (value != null) {
+          final selectedPen =
+              widget.allPigpens.firstWhere((p) => p.key == value);
+          // Only validate if changing to a new pigpen
+          if (selectedPen.key != widget.existingPig?.pigpenKey &&
+              selectedPen.isFull) {
+            return 'This pigpen is already full';
+          }
+        }
+        return null;
+      },
     );
   }
 

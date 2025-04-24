@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
 import 'package:pigcare/core/views/pigpens/pigpen_pigs_list_screen.dart';
 
@@ -171,6 +172,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
             content: Text(pigpen == null
                 ? "Pigpen added successfully"
                 : "Pigpen updated successfully"),
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -209,11 +211,14 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
           children: [
             const Text("Are you sure you want to delete this pigpen?"),
             if (pigpen.pigs.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.only(top: 8.0),
+              Padding(
+                padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "All pigs in this pen will be moved to Unassigned",
-                  style: TextStyle(color: Colors.red),
+                  "WARNING: All ${pigpen.pigs.length} pigs in this pen will be permanently deleted!",
+                  style: const TextStyle(
+                    color: Colors.red,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
           ],
@@ -225,7 +230,10 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+            child: const Text(
+              "Delete Anyway",
+              style: TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -238,18 +246,30 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
 
   Future<void> _deletePigpen(Pigpen pigpen) async {
     try {
-      final unassigned = await _ensureUnassignedPigpenExists();
+      // First get a copy of the pigs list since we'll be modifying it
+      final pigsToDelete = List<Pig>.from(pigpen.pigs);
 
-      if (pigpen.pigs.isNotEmpty) {
-        await unassigned.transferPigs(pigpen.pigs);
+      // Clear the pigpen's pigs list first to avoid reference issues
+      pigpen.pigs.clear();
+      await pigpen.save(); // Save the empty pigpen first
+
+      // Now delete each pig from Hive
+      final pigBox = Hive.box<Pig>('pigs'); // Make sure you have this box open
+      for (final pig in pigsToDelete) {
+        await pigBox.delete(pig.key); // Delete using the Hive box
       }
 
+      // Finally delete the pigpen itself
       await pigpen.delete();
       _loadExistingNames();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Pigpen deleted successfully")),
+          SnackBar(
+            content: Text(
+                "Pigpen and ${pigsToDelete.length} pigs deleted successfully"),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } catch (e) {
@@ -261,16 +281,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
           ),
         );
       }
-    }
-  }
-
-  Future<Pigpen> _ensureUnassignedPigpenExists() async {
-    try {
-      return _pigpenBox.values.firstWhere((p) => p.name == "Unassigned");
-    } catch (e) {
-      final newPigpen = Pigpen(name: "Unassigned", description: '');
-      await _pigpenBox.add(newPigpen);
-      return newPigpen;
+      debugPrint('Error details: $e');
     }
   }
 
@@ -376,7 +387,7 @@ class _PigpenCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isUnassigned = pigpen.name == "Unassigned";
     final capacityText = pigpen.capacity == 0
-        ? 'Unlimited'
+        ? '${pigpen.pigs.length}'
         : '${pigpen.pigs.length}/${pigpen.capacity}';
 
     return Card(
@@ -411,6 +422,7 @@ class _PigpenCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
+                  // In your _PigpenCard widget
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -420,7 +432,9 @@ class _PigpenCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      capacityText,
+                      pigpen.capacity == 0
+                          ? '${pigpen.pigs.length}'
+                          : '${pigpen.pigs.length}/${pigpen.capacity}',
                       style: TextStyle(
                         color:
                             pigpen.isFull ? Colors.red[800] : Colors.green[800],

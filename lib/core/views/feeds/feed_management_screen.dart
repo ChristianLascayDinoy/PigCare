@@ -244,6 +244,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
                         content: Text('Feed and expense saved successfully'),
+                        backgroundColor: Colors.green,
                       ),
                     );
                   }
@@ -252,6 +253,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Error saving data: ${e.toString()}'),
+                        backgroundColor: Colors.red,
                       ),
                     );
                   }
@@ -279,7 +281,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
               Padding(
                 padding: const EdgeInsets.only(top: 8.0),
                 child: Text(
-                  "Warning: This feed still has ${feedToDelete.quantity} kg remaining!",
+                  "Warning: This feed still has ${feedToDelete.remainingQuantity} kg remaining!",
                   style: const TextStyle(color: Colors.red),
                 ),
               ),
@@ -307,7 +309,9 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-                content: Text('Feed and expense deleted successfully')),
+              content: Text('Feed and expense deleted successfully'),
+              backgroundColor: Colors.red,
+            ),
           );
         }
       } catch (e) {
