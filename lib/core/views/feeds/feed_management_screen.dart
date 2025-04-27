@@ -378,23 +378,44 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text("🐷 PigCare Feeds"),
+            title: Row(
+              mainAxisSize:
+                  MainAxisSize.min, // <-- this helps center the Row contents
+              children: [
+                ClipOval(
+                  child: Image.asset(
+                    'lib/assets/images/feed.png',
+                    height: 40,
+                    width: 40,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  "Feed Management",
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
             centerTitle: true,
           ),
           body: Column(
             children: [
-              // Summary Card
+              // Inside the ValueListenableBuilder where the summary card is built:
               ValueListenableBuilder(
                 valueListenable: feedsBox.listenable(),
                 builder: (context, Box<Feed> box, _) {
-                  double totalRemaining = 0;
+                  double totalFeeds = 0;
                   int lowStockCount = 0;
+                  List<MapEntry<String, double>> feedQuantities = [];
 
                   for (final feed in box.values) {
-                    totalRemaining += feed.quantity;
-                    if (feed.quantity < lowStockThreshold) {
+                    totalFeeds += feed.quantity;
+                    if (feed.remainingQuantity < lowStockThreshold) {
                       lowStockCount++;
                     }
+                    feedQuantities
+                        .add(MapEntry(feed.name, feed.remainingQuantity));
                   }
 
                   return Card(
@@ -406,31 +427,71 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.inventory,
-                                  color: Theme.of(context).primaryColor),
+                              Image.asset(
+                                'lib/assets/images/feed.png',
+                                width: 24,
+                                height: 24,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 "Feed Inventory Summary",
-                                style: Theme.of(context).textTheme.titleMedium,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 8),
                           Text(
-                            "📦 Total Remaining: ${totalRemaining.toStringAsFixed(2)} kg",
+                            "Total Feeds: ${totalFeeds.toStringAsFixed(2)} kg",
                             style: Theme.of(context).textTheme.bodyLarge,
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            lowStockCount > 0
-                                ? "⚠️ $lowStockCount item(s) below $lowStockThreshold kg remaining"
-                                : "✅ Stock levels are good",
-                            style: TextStyle(
-                              color: lowStockCount > 0
-                                  ? Theme.of(context).colorScheme.error
-                                  : Colors.green,
+                          RichText(
+                            text: TextSpan(
+                              style: Theme.of(context).textTheme.bodyLarge,
+                              children: [
+                                TextSpan(
+                                  text: "Feeds Level: ",
+                                  style: TextStyle(color: Colors.black),
+                                ),
+                                TextSpan(
+                                  text: lowStockCount > 0
+                                      ? "$lowStockCount item(s) below $lowStockThreshold kg remaining"
+                                      : "Stock levels are good",
+                                  style: TextStyle(
+                                    color: lowStockCount > 0
+                                        ? Theme.of(context).colorScheme.error
+                                        : Colors.green,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
+                          // Add this new section for feed quantities
+                          if (feedQuantities.isNotEmpty) ...[
+                            const SizedBox(height: 20),
+                            const Text(
+                              "Remaining Quantities:",
+                              style: TextStyle(fontWeight: FontWeight.bold),
+                            ),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: feedQuantities.map((entry) {
+                                return Text(
+                                  "${entry.key}: ${entry.value.toStringAsFixed(2)} kg",
+                                  style: TextStyle(
+                                    color: entry.value < lowStockThreshold
+                                        ? Theme.of(context).colorScheme.error
+                                        : null,
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                         ],
                       ),
                     ),

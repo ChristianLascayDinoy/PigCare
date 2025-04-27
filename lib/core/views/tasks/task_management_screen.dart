@@ -114,7 +114,25 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Task Management"), // Changed from Event Management
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/task.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Task Management",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ), // Changed from Event Management
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [

@@ -716,7 +716,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Farm Reports"),
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/reports.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Farm Reports",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [

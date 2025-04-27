@@ -178,7 +178,25 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Expense Management"),
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/expenses.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Expense Management",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [
