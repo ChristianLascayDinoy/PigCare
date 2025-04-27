@@ -2,16 +2,16 @@ import 'package:flutter/material.dart';
 
 class DashboardCard extends StatelessWidget {
   final String title;
-  final IconData icon;
+  final String imagePath; // Now using imagePath instead of IconData
   final VoidCallback onTap;
-  final int? count; // Make it optional
+  final int? count;
 
   const DashboardCard({
     super.key,
     required this.title,
-    required this.icon,
+    required this.imagePath,
     required this.onTap,
-    this.count, // Accept count
+    this.count,
   });
 
   @override
@@ -20,25 +20,38 @@ class DashboardCard extends StatelessWidget {
       onTap: onTap,
       child: Card(
         elevation: 4,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 50, color: Colors.green[700]),
-              const SizedBox(height: 10),
+              // Image instead of Icon
+              Image.asset(
+                imagePath,
+                height: 60,
+                width: 60,
+                fit: BoxFit.contain,
+              ),
+              const SizedBox(height: 12),
               Text(
                 title,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               if (count != null) ...[
-                const SizedBox(height: 5),
+                const SizedBox(height: 8),
                 Text(
-                  '$count', // Display the count
+                  '$count',
                   style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.w600),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ],

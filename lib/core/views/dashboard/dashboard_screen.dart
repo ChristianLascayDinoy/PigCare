@@ -95,9 +95,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   AppBar _buildAppBar() {
     return AppBar(
-      title: const Text(
-        "🐷 PigCare Dashboard",
-        style: TextStyle(fontWeight: FontWeight.bold),
+      centerTitle: true, // <-- add this line to center the title
+      title: Row(
+        mainAxisSize:
+            MainAxisSize.min, // <-- this helps center the Row contents
+        children: [
+          ClipOval(
+            child: Image.asset(
+              'lib/assets/images/pigcare_logo.jpg',
+              height: 40,
+              width: 40,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(width: 8),
+          const Text(
+            "PigCare Dashboard",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+        ],
       ),
       backgroundColor: Colors.green[700],
       elevation: 0,
@@ -179,37 +195,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
       children: [
         DashboardCard(
           title: "Pigpens",
-          icon: Icons.home,
+          imagePath: 'lib/assets/images/pigpen.png',
           onTap: () => _navigateToPigpenManagement(),
         ),
         DashboardCard(
           title: "Pigs",
-          icon: Icons.pets,
+          imagePath: 'lib/assets/images/pig.png',
           onTap: () => _navigateToPigManagement(),
         ),
         DashboardCard(
           title: "Feeds",
-          icon: Icons.food_bank,
+          imagePath: 'lib/assets/images/feed.png',
           onTap: () => _navigateToFeedManagement(),
         ),
         DashboardCard(
           title: "Tasks",
-          icon: Icons.event,
+          imagePath: 'lib/assets/images/task.png',
           onTap: () => _navigateToTaskManagement(),
         ),
         DashboardCard(
           title: "Expenses",
-          icon: Icons.attach_money,
+          imagePath: 'lib/assets/images/expenses.png',
           onTap: () => _navigateToExpenseManagement(),
         ),
         DashboardCard(
           title: "Sales",
-          icon: Icons.shopping_cart,
+          imagePath: 'lib/assets/images/sales.png',
           onTap: () => _navigateToSalesManagement(),
         ),
         DashboardCard(
           title: "Reports",
-          icon: Icons.bar_chart,
+          imagePath: 'lib/assets/images/reports.png',
           onTap: () => _navigateToReports(),
         ),
       ],
@@ -305,7 +321,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   // Summary card widgets
   Widget _buildPigpenCount(bool isSmallScreen) {
     return Text(
-      "📦 Total Pigpens: ${_pigpenBox.length}",
+      "Total Pigpens: ${_pigpenBox.length}",
       style: TextStyle(
         fontSize: isSmallScreen ? 16 : 18,
         fontWeight: FontWeight.bold,
@@ -315,7 +331,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   Widget _buildTotalPigsCount(bool isSmallScreen) {
     return Text(
-      "🐷 Total Pigs: $_totalPigs",
+      "Total Pigs: $_totalPigs",
       style: TextStyle(
         fontSize: isSmallScreen ? 16 : 18,
         fontWeight: FontWeight.bold,
@@ -337,11 +353,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(text: "📊 Feeds Level: "),
+                  const TextSpan(text: "Feeds Level: "),
                   TextSpan(
                     text: lowStockCount > 0
-                        ? "⚠️ $lowStockCount low stock"
-                        : "✅ Stock good",
+                        ? "$lowStockCount low stock"
+                        : "Stock good",
                     style: TextStyle(
                       color: lowStockCount > 0 ? Colors.orange : Colors.green,
                     ),
@@ -371,7 +387,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.event, size: 20, color: Colors.green),
             const SizedBox(width: 8),
             Text.rich(
               TextSpan(
@@ -380,7 +395,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   TextSpan(
                     text: upcomingTasks > 0
                         ? "$upcomingTasks Upcoming"
-                        : "✅ All caught up",
+                        : "All caught up",
                     style: TextStyle(
                       fontSize: isSmallScreen ? 14 : 16,
                       color: upcomingTasks > 0 ? Colors.blue : Colors.green,
@@ -406,9 +421,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           DrawerHeader(
             decoration: BoxDecoration(color: Colors.green[700]),
-            child: const Text(
-              'Menu',
-              style: TextStyle(color: Colors.white, fontSize: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ClipOval(
+                  child: Image.asset(
+                    'lib/assets/images/pigcare_logo.jpg',
+                    height: 80,
+                    width: 80,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Menu',
+                  style: TextStyle(color: Colors.white, fontSize: 24),
+                ),
+              ],
             ),
           ),
           ListTile(
