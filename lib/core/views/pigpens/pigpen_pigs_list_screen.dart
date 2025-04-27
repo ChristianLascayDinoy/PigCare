@@ -18,7 +18,31 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Pigs in ${widget.pigpen.name}'),
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/pig.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text('Pigs in ${widget.pigpen.name} Pigpen'),
+            const SizedBox(width: 8),
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/pigpen.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+          ],
+        ),
         centerTitle: true,
       ),
       body: ValueListenableBuilder<Box<Pigpen>>(
@@ -32,7 +56,13 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.pets, size: 48, color: Colors.grey[400]),
+                  Image.asset(
+                    'lib/assets/images/pig.png', // Use your image path here
+                    height: 48, // You can adjust the size as needed
+                    width: 48,
+                    fit: BoxFit
+                        .cover, // Ensures the image maintains aspect ratio
+                  ),
                   const SizedBox(height: 16),
                   const Text(
                     'No pigs in this pen',

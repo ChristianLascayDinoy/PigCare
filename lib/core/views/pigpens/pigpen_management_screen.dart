@@ -297,17 +297,40 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pigpen Management"),
-        centerTitle: true,
-        backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddEditDialog(),
-            tooltip: 'Add new pigpen',
+          title: Row(
+            mainAxisSize:
+                MainAxisSize.min, // <-- this helps center the Row contents
+            children: [
+              ClipOval(
+                child: Image.asset(
+                  'lib/assets/images/pigpen.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                "Pigpen Management",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
           ),
-        ],
-      ),
+          centerTitle: true,
+          backgroundColor: Colors.green[700],
+          actions: [
+            TextButton.icon(
+              onPressed: () => _showAddEditDialog(),
+              icon: const Icon(Icons.add, color: Colors.white),
+              label: const Text(
+                'Add Pigpen',
+                style: TextStyle(color: Colors.white),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.white,
+              ),
+            ),
+          ]),
       body: Column(
         children: [
           Padding(
@@ -462,15 +485,37 @@ class _PigpenCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      color: Colors.blue,
-                      onPressed: onEdit,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, size: 20),
-                      color: Colors.red,
-                      onPressed: onDelete,
+                    PopupMenuButton<String>(
+                      onSelected: (value) {
+                        if (value == 'view') {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  PigpenPigsListScreen(pigpen: pigpen),
+                            ),
+                          );
+                        } else if (value == 'edit') {
+                          onEdit();
+                        } else if (value == 'delete') {
+                          onDelete();
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'view',
+                          child: Text('View Pigs'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'edit',
+                          child: Text('Edit'),
+                        ),
+                        const PopupMenuItem(
+                          value: 'delete',
+                          child: Text('Delete'),
+                        ),
+                      ],
+                      icon: const Icon(Icons.more_vert), // three dots icon
                     ),
                   ],
                 ),
