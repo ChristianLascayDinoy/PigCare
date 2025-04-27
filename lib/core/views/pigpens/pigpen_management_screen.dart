@@ -104,7 +104,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                 TextFormField(
                   controller: descriptionController,
                   decoration: const InputDecoration(
-                    labelText: "Description",
+                    labelText: "Description (Optional)",
                     border: OutlineInputBorder(),
                   ),
                   maxLines: 3,

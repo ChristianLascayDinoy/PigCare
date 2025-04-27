@@ -351,7 +351,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "${pig.breed} • ${pig.gender} • ${pig.getFormattedAge()}",
+                      "${pig.gender} • ${pig.stage} • ${pig.getFormattedAge()}",
                       style: const TextStyle(fontSize: 14),
                     ),
                     if (pig.pigpenKey != null) ...[
@@ -383,7 +383,14 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
       backgroundColor: Colors.grey[200],
       backgroundImage:
           pig.imagePath != null ? FileImage(File(pig.imagePath!)) : null,
-      child: pig.imagePath == null ? const Icon(Icons.pets, size: 30) : null,
+      child: pig.imagePath == null
+          ? Image.asset(
+              'lib/assets/images/pig.png',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+            )
+          : null,
     );
   }
 
@@ -495,6 +502,15 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
     'Other'
   ];
 
+  List<String> _getStagesForGender(String? gender) {
+    if (gender == 'Male') {
+      return ['Piglet', 'Weaner', 'Grower', 'Finisher', 'Boar'];
+    } else if (gender == 'Female') {
+      return ['Piglet', 'Weaner', 'Grower', 'Finisher', 'Sow'];
+    }
+    return []; // Default empty list if no gender is selected
+  }
+
   @override
   void initState() {
     super.initState();
@@ -519,11 +535,11 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
     };
 
     _dropdownValues = {
-      'gender': widget.existingPig?.gender ?? 'Female',
-      'stage': widget.existingPig?.stage ?? 'Piglet',
-      'source': widget.existingPig?.source ?? 'Born on Farm',
-      'pigpenKey': widget.existingPig?.pigpenKey,
-      'breed': widget.existingPig?.breed ?? _pigBreeds.first,
+      'gender': widget.existingPig?.gender,
+      'stage': widget.existingPig?.stage,
+      'source': widget.existingPig?.source,
+      'pigpenKey': null,
+      'breed': widget.existingPig?.breed,
       'motherTag': widget.existingPig?.motherTag,
       'fatherTag': widget.existingPig?.fatherTag,
       'imagePath': widget.existingPig?.imagePath,
@@ -619,11 +635,16 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
                   : null,
             ),
             child: _dropdownValues['imagePath'] == null
-                ? const Column(
+                ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.add_a_photo, size: 30, color: Colors.grey),
-                      Text("Add Photo", style: TextStyle(fontSize: 12)),
+                      Image.asset(
+                        'lib/assets/images/pig.png',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.contain,
+                      ),
+                      const Text("Add Photo", style: TextStyle(fontSize: 12)),
                     ],
                   )
                 : null,
@@ -694,28 +715,24 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
       children: [
         TextFormField(
           controller: _controllers['tag'],
-          keyboardType: TextInputType.number, // Shows numeric keyboard
+          keyboardType: TextInputType.text, // Allow letters and numbers
           inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly, // Only allows digits
-            FilteringTextInputFormatter.deny(
-                RegExp(r'^0')), // Optional: Prevent leading zero
-            LengthLimitingTextInputFormatter(10), // Optional: Limit length
+            FilteringTextInputFormatter.allow(
+                RegExp(r'[a-zA-Z0-9]')), // Allows letters and digits
+            LengthLimitingTextInputFormatter(
+                10), // Limit to 10 characters (optional)
           ],
           decoration: const InputDecoration(
             labelText: "Tag Number *",
             border: OutlineInputBorder(),
-            hintText: "Enter numbers only",
+            hintText: "Enter tag (letters and numbers allowed)",
           ),
           readOnly: widget.existingPig != null,
           validator: (value) {
             final trimmedValue = value?.trim() ?? '';
             if (trimmedValue.isEmpty) return 'Required field';
-            if (!RegExp(r'^[0-9]+$').hasMatch(trimmedValue)) {
-              return 'Only numbers are allowed';
-            }
-            if (trimmedValue.length < 3) {
-              // Optional: Minimum length
-              return 'Tag must be at least 3 digits';
+            if (!RegExp(r'^[a-zA-Z0-9]+$').hasMatch(trimmedValue)) {
+              return 'Only letters and numbers are allowed';
             }
 
             // Check against all existing tags (trimmed)
@@ -751,15 +768,17 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
 
   Widget _buildPigpenDropdown() {
     return DropdownButtonFormField<int?>(
-      value: _dropdownValues['pigpenKey'],
+      value: _dropdownValues['pigpenKey'], // This will be null initially
       decoration: const InputDecoration(
         labelText: "Pigpen",
         border: OutlineInputBorder(),
+        hintText: "Select a pigpen", // Add a hint text
       ),
       items: [
         const DropdownMenuItem<int?>(
           value: null,
-          child: Text("Unassigned"),
+          child:
+              Text("Select a pigpen...", style: TextStyle(color: Colors.grey)),
         ),
         ...widget.allPigpens
             .where((p) => p.name != "Unassigned")
@@ -830,27 +849,39 @@ class __AddEditPigDialogState extends State<_AddEditPigDialog> {
           child: Text(gender),
         );
       }).toList(),
-      onChanged: (value) => setState(() => _dropdownValues['gender'] = value),
+      onChanged: (value) {
+        setState(() {
+          _dropdownValues['gender'] = value;
+          // Reset stage when gender changes
+          _dropdownValues['stage'] = null;
+        });
+      },
       validator: (value) => value == null ? 'Please select a gender' : null,
     );
   }
 
   Widget _buildStageDropdown() {
+    final availableStages = _getStagesForGender(_dropdownValues['gender']);
+
     return DropdownButtonFormField<String>(
       value: _dropdownValues['stage'],
       decoration: const InputDecoration(
         labelText: "Pig Stage *",
         border: OutlineInputBorder(),
       ),
-      items: ['Piglet', 'Weaner', 'Grower', 'Finisher', 'Sow', 'Boar']
-          .map((stage) {
+      items: availableStages.map((stage) {
         return DropdownMenuItem(
           value: stage,
           child: Text(stage),
         );
       }).toList(),
       onChanged: (value) => setState(() => _dropdownValues['stage'] = value),
-      validator: (value) => value == null ? 'Please select a stage' : null,
+      validator: (value) {
+        if (value == null) return 'Please select a stage';
+        if (!availableStages.contains(value))
+          return 'Invalid stage for selected gender';
+        return null;
+      },
     );
   }
 

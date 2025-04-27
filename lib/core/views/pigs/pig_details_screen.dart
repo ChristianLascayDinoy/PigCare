@@ -128,12 +128,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         ),
         backgroundColor: Colors.green[700],
         iconTheme: const IconThemeData(color: Colors.white),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert),
-            onPressed: () => _showOptionsMenu(context),
-          ),
-        ],
         bottom: TabBar(
           controller: _tabController,
           labelColor: Colors.white,
@@ -218,15 +212,25 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   }
 
   Widget _buildLoadingAvatar() {
-    return const Center(
-      child: CircularProgressIndicator(),
+    return Center(
+      child: Image.asset(
+        'lib/assets/images/pig.png',
+        width: 60,
+        height: 60,
+        fit: BoxFit.contain,
+      ),
     );
   }
 
   Widget _buildDefaultAvatar() {
     return Container(
       color: Colors.grey[200],
-      child: Icon(Icons.pets, size: 60, color: Colors.green[700]),
+      child: Image.asset(
+        'lib/assets/images/pig.png',
+        width: 60,
+        height: 60,
+        fit: BoxFit.contain,
+      ),
     );
   }
 
@@ -648,80 +652,6 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         SnackBar(content: Text('Parent with tag $tag not found')),
       );
     }
-  }
-
-  void _showOptionsMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.share, color: Colors.blue),
-                title: const Text("Share Pig Details"),
-                onTap: () {
-                  Navigator.pop(context);
-                  _sharePigDetails();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.red),
-                title: const Text("Delete Pig"),
-                onTap: () {
-                  Navigator.pop(context);
-                  _confirmDeletePig();
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void _sharePigDetails() {
-    final String shareText = '''
-Pig Details:
-Tag: ${_currentPig.tag}
-Name: ${_currentPig.name ?? '-'}
-Breed: ${_currentPig.breed}
-Weight: ${_currentPig.weight} kg
-Age: ${_currentPig.getFormattedAge()}
-Pigpen: ${_currentPig.pigpenKey != null ? _currentPig.getPigpenName(widget.pigpens) ?? "Unknown" : "Unassigned"}
-Mother: ${_currentPig.motherTag ?? '-'}
-Father: ${_currentPig.fatherTag ?? '-'}
-''';
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share: $shareText')),
-      );
-    }
-  }
-
-  void _confirmDeletePig() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: const Text("Are you sure you want to delete this pig?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              widget.onPigDeleted(_currentPig);
-              if (mounted) Navigator.pop(context);
-            },
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
   }
 
   Color _getTaskTypeColor(String type) {

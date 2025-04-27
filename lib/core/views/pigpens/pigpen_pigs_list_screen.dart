@@ -19,8 +19,7 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
               child: Image.asset(
@@ -57,16 +56,15 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Image.asset(
-                    'lib/assets/images/pig.png', // Use your image path here
-                    height: 48, // You can adjust the size as needed
-                    width: 48,
-                    fit: BoxFit
-                        .cover, // Ensures the image maintains aspect ratio
+                    'lib/assets/images/pig.png',
+                    height: 100,
+                    width: 100,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'No pigs in this pen',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  Text(
+                    'No pigs in ${widget.pigpen.name} pen',
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                 ],
               ),
@@ -86,37 +84,39 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
   Widget _buildPigCard(Pig pig) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            _buildPigAvatar(pig),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Tag: ${pig.tag}",
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+      child: InkWell(
+        child: Padding(
+          padding: const EdgeInsets.all(12.0),
+          child: Row(
+            children: [
+              _buildPigAvatar(pig),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Tag: ${pig.tag}",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    "${pig.breed} • ${pig.gender} • ${pig.getFormattedAge()}",
-                    style: const TextStyle(fontSize: 14),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    "${pig.weight} kg",
-                    style: const TextStyle(fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      "${pig.gender} • ${pig.stage} • ${pig.getFormattedAge()}",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      "${pig.weight} kg",
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -129,7 +129,12 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
       backgroundImage:
           pig.imagePath != null ? FileImage(File(pig.imagePath!)) : null,
       child: pig.imagePath == null
-          ? const Icon(Icons.pets, size: 30, color: Colors.grey)
+          ? Image.asset(
+              'lib/assets/images/pig.png',
+              width: 30,
+              height: 30,
+              fit: BoxFit.contain,
+            )
           : null,
     );
   }
