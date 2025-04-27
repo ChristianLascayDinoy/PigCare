@@ -132,7 +132,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
-        ), // Changed from Event Management
+        ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [

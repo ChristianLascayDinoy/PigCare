@@ -18,7 +18,7 @@ class _IntroScreenState extends State<IntroScreen> {
     OnboardingPage(
       title: "Pigpen Management",
       description: "Track all your pigpens and their populations at a glance",
-      icon: Icons.home_work,
+      imagePath: "lib/assets/images/pigpen.png",
       color: Colors.green.shade100,
       features: [
         "View total pigpen count",
@@ -29,7 +29,7 @@ class _IntroScreenState extends State<IntroScreen> {
     OnboardingPage(
       title: "Pig Tracking",
       description: "Monitor individual pigs with detailed records",
-      icon: Icons.pets,
+      imagePath: "lib/assets/images/pig.png",
       color: Colors.blue.shade100,
       features: [
         "Track growth and health",
@@ -40,11 +40,11 @@ class _IntroScreenState extends State<IntroScreen> {
     OnboardingPage(
       title: "Farm Operations",
       description: "Complete farm management solution",
-      icon: Icons.agriculture,
+      imagePath: "lib/assets/images/pig_farm.png",
       color: Colors.orange.shade100,
       features: [
         "Feed management",
-        "Event tracking",
+        "Task Tracking",
         "Expenses & sales",
         "Reports generation"
       ],
@@ -209,10 +209,11 @@ class OnboardingPageContent extends StatelessWidget {
                 ),
               ],
             ),
-            child: Icon(
-              page.icon,
-              size: 60,
-              color: Colors.green[800],
+            child: Image.asset(
+              page.imagePath,
+              height: 60,
+              width: 60, // Add width for consistency
+              fit: BoxFit.contain, // Ensures proper image scaling
             ),
           ),
 
@@ -282,14 +283,14 @@ class OnboardingPageContent extends StatelessWidget {
 class OnboardingPage {
   final String title;
   final String description;
-  final IconData icon;
+  final String imagePath;
   final Color color;
   final List<String> features;
 
   const OnboardingPage({
     required this.title,
     required this.description,
-    required this.icon,
+    required this.imagePath,
     required this.color,
     required this.features,
   });

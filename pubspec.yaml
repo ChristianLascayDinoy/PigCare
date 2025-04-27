@@ -91,6 +91,7 @@ flutter:
   - lib/assets/images/expenses.png
   - lib/assets/images/sales.png
   - lib/assets/images/reports.png
+  - lib/assets/images/pig_farm.png
   #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
