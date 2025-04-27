@@ -232,14 +232,38 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Pig Management"),
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/pig.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "Pig Management",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddPigDialog,
-            tooltip: 'Add new pig',
+          TextButton.icon(
+            onPressed: () => _showAddPigDialog(),
+            icon: const Icon(Icons.add, color: Colors.white),
+            label: const Text(
+              'Add Pig',
+              style: TextStyle(color: Colors.white),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.white,
+            ),
           ),
         ],
       ),
@@ -364,20 +388,71 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
   }
 
   Widget _buildPigActions(Pig pig) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        IconButton(
-          icon: const Icon(Icons.edit, color: Colors.blue),
-          onPressed: () => _showEditPigDialog(pig),
-          tooltip: 'Edit pig',
-        ),
-        IconButton(
-          icon: const Icon(Icons.delete, color: Colors.red),
-          onPressed: () => _deletePig(pig),
-          tooltip: 'Delete pig',
-        ),
-      ],
+    return PopupMenuButton<String>(
+      onSelected: (String value) {
+        switch (value) {
+          case 'view':
+            // Navigate to PigDetailsScreen when "View Details" is selected
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => PigDetailsScreen(
+                  pig: pig,
+                  pigpens: _allPigpens,
+                  onPigUpdated: (updatedPig) {
+                    _savePig(updatedPig);
+                  },
+                  onPigDeleted: (pigToDelete) {
+                    _deletePig(pigToDelete);
+                  },
+                  allPigs: _allPigs,
+                ),
+              ),
+            );
+            break;
+          case 'edit':
+            _showEditPigDialog(pig);
+            break;
+          case 'delete':
+            _deletePig(pig);
+            break;
+        }
+      },
+      itemBuilder: (BuildContext context) {
+        return [
+          PopupMenuItem<String>(
+            value: 'view',
+            child: Row(
+              children: const [
+                Icon(Icons.visibility, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('View Details'),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'edit',
+            child: Row(
+              children: const [
+                Icon(Icons.edit, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('Edit'),
+              ],
+            ),
+          ),
+          PopupMenuItem<String>(
+            value: 'delete',
+            child: Row(
+              children: const [
+                Icon(Icons.delete, color: Colors.red),
+                SizedBox(width: 8),
+                Text('Delete'),
+              ],
+            ),
+          ),
+        ];
+      },
+      icon: const Icon(Icons.more_vert, color: Colors.black),
     );
   }
 }

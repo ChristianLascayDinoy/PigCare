@@ -502,20 +502,43 @@ class _PigpenCard extends StatelessWidget {
                         }
                       },
                       itemBuilder: (context) => [
+                        // View Pigs
                         const PopupMenuItem(
                           value: 'view',
-                          child: Text('View Pigs'),
+                          child: Row(
+                            children: [
+                              Icon(Icons.visibility,
+                                  color: Colors.blue), // View icon
+                              SizedBox(width: 8),
+                              Text('View Pigs'),
+                            ],
+                          ),
                         ),
+                        // Edit
                         const PopupMenuItem(
                           value: 'edit',
-                          child: Text('Edit'),
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, color: Colors.blue), // Edit icon
+                              SizedBox(width: 8),
+                              Text('Edit'),
+                            ],
+                          ),
                         ),
+                        // Delete
                         const PopupMenuItem(
                           value: 'delete',
-                          child: Text('Delete'),
+                          child: Row(
+                            children: [
+                              Icon(Icons.delete,
+                                  color: Colors.red), // Delete icon
+                              SizedBox(width: 8),
+                              Text('Delete'),
+                            ],
+                          ),
                         ),
                       ],
-                      icon: const Icon(Icons.more_vert), // three dots icon
+                      icon: const Icon(Icons.more_vert), // Three dots icon
                     ),
                   ],
                 ),
