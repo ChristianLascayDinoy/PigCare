@@ -179,8 +179,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
               child: Image.asset(
@@ -199,13 +198,12 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _showAddExpenseDialog,
-            tooltip: 'Add new expense',
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddExpenseDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Expense'),
+        backgroundColor: Colors.green[700],
       ),
       body: _isLoading
           ? _buildLoadingIndicator()
@@ -493,6 +491,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
   Future<void> _showAddExpenseDialog() async {
     final pigpenBox = Hive.box<Pigpen>('pigpens');
     final allPigs = pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = pigpenBox.values.toList();
 
     final result = await showDialog<Expense>(
       context: context,
@@ -501,6 +500,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
             Provider.of<FeedExpenseProvider>(context, listen: false);
         return AddEditExpenseDialog(
           allPigs: allPigs,
+          allPigpens: allPigpens,
           initialSelectedPigs: [],
           expensesBox: provider.expensesBox,
         );
@@ -547,6 +547,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
 
     final pigpenBox = Hive.box<Pigpen>('pigpens');
     final allPigs = pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = pigpenBox.values.toList(); // Get all pigpens
 
     final result = await showDialog<Expense>(
       context: context,
@@ -555,6 +556,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
             Provider.of<FeedExpenseProvider>(context, listen: false);
         return AddEditExpenseDialog(
           allPigs: allPigs,
+          allPigpens: allPigpens, // Pass the pigpens to the dialog
           existingExpense: expense,
           initialSelectedPigs: expense.pigTags,
           expensesBox: provider.expensesBox,
@@ -719,6 +721,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
 
 class AddEditExpenseDialog extends StatefulWidget {
   final List<Pig> allPigs;
+  final List<Pigpen> allPigpens;
   final Expense? existingExpense;
   final List<String> initialSelectedPigs;
   final Box<Expense> expensesBox;
@@ -726,6 +729,7 @@ class AddEditExpenseDialog extends StatefulWidget {
   const AddEditExpenseDialog({
     super.key,
     required this.allPigs,
+    required this.allPigpens,
     this.existingExpense,
     required this.initialSelectedPigs,
     required this.expensesBox,
@@ -743,6 +747,9 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
   late DateTime _selectedDate;
   late String _selectedCategory;
   late List<String> _selectedPigTags;
+  late Pigpen? _selectedPigpen;
+  late bool _assignToAllPigsInPen;
+  late List<Pig> _pigsInSelectedPen;
 
   @override
   void initState() {
@@ -756,6 +763,19 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
     _selectedDate = widget.existingExpense?.date ?? DateTime.now();
     _selectedCategory = widget.existingExpense?.category ?? 'Feed';
     _selectedPigTags = List.from(widget.initialSelectedPigs);
+    _assignToAllPigsInPen = false;
+    _pigsInSelectedPen = [];
+    _selectedPigpen = null;
+  }
+
+  void _updatePigsList(Pigpen? pigpen) {
+    setState(() {
+      _selectedPigpen = pigpen;
+      _pigsInSelectedPen = pigpen?.pigs.toList() ?? [];
+      if (_assignToAllPigsInPen) {
+        _selectedPigTags = _pigsInSelectedPen.map((pig) => pig.tag).toList();
+      }
+    });
   }
 
   @override
@@ -764,6 +784,13 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
       appBar: AppBar(
         title: Text(
             widget.existingExpense != null ? "Edit Expense" : "Add Expense"),
+        actions: [
+          if (widget.existingExpense != null)
+            IconButton(
+              icon: const Icon(Icons.delete, color: Colors.red),
+              onPressed: _confirmDeleteExpense,
+            ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -846,7 +873,9 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              _buildPigSelection(),
+              _buildPigPenDropdown(),
+              const SizedBox(height: 16),
+              if (_selectedPigpen != null) _buildPigSelection(),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -872,51 +901,132 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
     );
   }
 
-  Widget _buildPigSelection() {
+  Widget _buildPigPenDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Select Pigs (Optional)",
+          "Select Pig Pen (Optional)",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(8),
+        DropdownButtonFormField<Pigpen>(
+          decoration: const InputDecoration(
+            labelText: "Pig Pen",
+            border: OutlineInputBorder(),
           ),
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: widget.allPigs.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text("No pigs available to select"),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: widget.allPigs.length,
-                  itemBuilder: (context, index) {
-                    final pig = widget.allPigs[index];
-                    return CheckboxListTile(
-                      title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
-                      value: _selectedPigTags.contains(pig.tag),
-                      onChanged: (selected) {
-                        setState(() {
-                          if (selected == true) {
-                            _selectedPigTags.add(pig.tag);
-                          } else {
-                            _selectedPigTags.remove(pig.tag);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
+          value: _selectedPigpen,
+          items: widget.allPigpens.map((pen) {
+            return DropdownMenuItem(
+              value: pen,
+              child: Text("${pen.name} (${pen.pigs.length} pigs)"),
+            );
+          }).toList(),
+          onChanged: _updatePigsList,
         ),
       ],
     );
+  }
+
+  Widget _buildPigSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        CheckboxListTile(
+          title: const Text("Apply to all pigs in this pen"),
+          value: _assignToAllPigsInPen,
+          onChanged: (value) {
+            setState(() {
+              _assignToAllPigsInPen = value!;
+              if (_assignToAllPigsInPen) {
+                _selectedPigTags =
+                    _pigsInSelectedPen.map((pig) => pig.tag).toList();
+              } else {
+                _selectedPigTags.clear();
+              }
+            });
+          },
+        ),
+        if (!_assignToAllPigsInPen) ...[
+          const SizedBox(height: 8),
+          const Text("Select Pigs:",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: _pigsInSelectedPen.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text("No pigs in this pen"),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _pigsInSelectedPen.length,
+                    itemBuilder: (context, index) {
+                      final pig = _pigsInSelectedPen[index];
+                      return CheckboxListTile(
+                        title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
+                        value: _selectedPigTags.contains(pig.tag),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected == true) {
+                              _selectedPigTags.add(pig.tag);
+                            } else {
+                              _selectedPigTags.remove(pig.tag);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Future<void> _confirmDeleteExpense() async {
+    if (widget.existingExpense == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: Text("Delete ${widget.existingExpense!.name} expense?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await widget.expensesBox.delete(widget.existingExpense!.id);
+        if (mounted) {
+          Navigator.pop(context);
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error deleting expense: $e')),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _selectDate(BuildContext context) async {

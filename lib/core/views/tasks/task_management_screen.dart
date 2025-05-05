@@ -1,16 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
-import '../../models/task_model.dart'; // This should be updated to task_model.dart
+import '../../models/task_model.dart';
 import '../../models/pig_model.dart';
+import '../../models/pigpen_model.dart';
 
 class TaskManagementScreen extends StatefulWidget {
   final List<Pig> allPigs;
+  final List<Pigpen> allPigpens;
   final List<String> initialSelectedPigs;
 
   const TaskManagementScreen({
     super.key,
     required this.allPigs,
+    required this.allPigpens,
     required this.initialSelectedPigs,
   });
 
@@ -115,8 +118,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
               child: Image.asset(
@@ -135,13 +137,12 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddTaskDialog(context),
-            tooltip: 'Add new task', // Changed from event
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showAddTaskDialog(context),
+        icon: const Icon(Icons.add),
+        label: const Text('Add Task'),
+        backgroundColor: Colors.green[700],
       ),
       body: Column(
         children: [
@@ -167,7 +168,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         children: [
           TextField(
             decoration: InputDecoration(
-              hintText: 'Search tasks...', // Changed from events
+              hintText: 'Search tasks...',
               prefixIcon: const Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),
@@ -200,8 +201,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       return Center(
         child: Text(
           _searchQuery.isEmpty
-              ? "No tasks found\nAdd your first task!" // Changed from events
-              : "No tasks match your search", // Changed from events
+              ? "No tasks found\nAdd your first task!"
+              : "No tasks match your search",
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 18, color: Colors.grey),
         ),
@@ -251,9 +252,8 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                     ),
                   ),
                   Chip(
-                    label: Text(task.taskType), // Changed from eventType
-                    backgroundColor:
-                        _getTaskTypeColor(task.taskType), // Changed from event
+                    label: Text(task.taskType),
+                    backgroundColor: _getTaskTypeColor(task.taskType),
                   ),
                 ],
               ),
@@ -326,16 +326,14 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                 children: [
                   if (!task.isCompleted) ...[
                     TextButton(
-                      onPressed: () =>
-                          _markTaskAsComplete(task), // Changed from event
+                      onPressed: () => _markTaskAsComplete(task),
                       child: const Text("Mark Complete"),
                     ),
                     const SizedBox(width: 8),
                     IconButton(
                       icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () =>
-                          _showTaskDetails(context, task), // Changed from event
-                      tooltip: 'Edit task', // Changed from event
+                      onPressed: () => _showTaskDetails(context, task),
+                      tooltip: 'Edit task',
                     ),
                   ],
                 ],
@@ -373,7 +371,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           isCompleted: true,
           completedDate: DateTime.now(),
         );
-        await _tasksBox.put(task.id, completedTask); // This saves to Hive
+        await _tasksBox.put(task.id, completedTask);
         await _loadTasks();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -394,18 +392,18 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     final result = await Navigator.of(context).push<PigTask>(
       MaterialPageRoute(
         builder: (context) => AddEditTaskDialog(
-          // Changed from Event
           allPigs: widget.allPigs,
-          existingTask: null, // Changed from event
+          allPigpens: widget.allPigpens,
+          existingTask: null,
           initialSelectedPigs: widget.initialSelectedPigs,
-          tasksBox: _tasksBox, // Changed from eventsBox
+          tasksBox: _tasksBox,
         ),
         fullscreenDialog: true,
       ),
     );
 
     if (result != null && mounted) {
-      await _saveTask(result); // Changed from event
+      await _saveTask(result);
     }
   }
 
@@ -420,19 +418,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Type: ${task.taskType}'), // Changed from eventType
+                Text('Type: ${task.taskType}'),
                 Text('Date: ${DateFormat.yMMMd().format(task.date)}'),
                 if (task.completedDate != null)
                   Text(
                       'Completed: ${DateFormat.yMMMd().format(task.completedDate!)}'),
                 const SizedBox(height: 16),
-                const Text('Pigs in this task:', // Changed from event
+                const Text('Pigs in this task:',
                     style: TextStyle(fontWeight: FontWeight.bold)),
                 Column(
                   children: task.pigTags.map((tag) => Text(tag)).toList(),
                 ),
                 const SizedBox(height: 16),
-                Text(task.description),
+                Text(task.description ?? 'No description'),
               ],
             ),
           ),
@@ -443,13 +441,11 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             ),
             TextButton(
               onPressed: () async {
-                // Show confirmation before actual deletion
                 final confirmed = await showDialog<bool>(
                   context: context,
                   builder: (context) => AlertDialog(
                     title: const Text("Confirm Delete"),
-                    content:
-                        Text("Delete ${task.name} task?"), // Changed from event
+                    content: Text("Delete ${task.name} task?"),
                     actions: [
                       TextButton(
                         onPressed: () => Navigator.pop(context, false),
@@ -463,8 +459,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                     ],
                   ),
                 );
-
-                // Close both dialogs and return the confirmation result
                 Navigator.pop(context, confirmed ?? false);
               },
               child: const Text("Delete", style: TextStyle(color: Colors.red)),
@@ -474,17 +468,17 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       );
 
       if (shouldDelete == true && mounted) {
-        await _deleteTask(task); // Changed from event
+        await _deleteTask(task);
       }
     } else {
       final result = await Navigator.of(context).push<dynamic>(
         MaterialPageRoute(
           builder: (context) => AddEditTaskDialog(
-            // Changed from Event
             allPigs: widget.allPigs,
-            existingTask: task, // Changed from event
+            allPigpens: widget.allPigpens,
+            existingTask: task,
             initialSelectedPigs: task.pigTags,
-            tasksBox: _tasksBox, // Changed from eventsBox
+            tasksBox: _tasksBox,
           ),
         ),
       );
@@ -495,7 +489,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
             await _loadTasks();
           }
         } else if (result is PigTask) {
-          await _saveTask(result); // Changed from event
+          await _saveTask(result);
         }
       }
     }
@@ -507,22 +501,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       await _loadTasks();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Task saved successfully')), // Changed from event
+          const SnackBar(content: Text('Task saved successfully')),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Error saving task: $e')), // Changed from event
+          SnackBar(content: Text('Error saving task: $e')),
         );
       }
     }
   }
 
   Color _getTaskTypeColor(String type) {
-    // Changed from event
     switch (type) {
       case 'Health':
         return Colors.red[100]!;
@@ -539,15 +530,16 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
 }
 
 class AddEditTaskDialog extends StatefulWidget {
-  // Changed from Event
   final List<Pig> allPigs;
-  final PigTask? existingTask; // Changed from event
+  final List<Pigpen> allPigpens;
+  final PigTask? existingTask;
   final List<String> initialSelectedPigs;
-  final Box<PigTask> tasksBox; // Changed from eventsBox
+  final Box<PigTask> tasksBox;
 
   const AddEditTaskDialog({
     super.key,
     required this.allPigs,
+    required this.allPigpens,
     this.existingTask,
     required this.initialSelectedPigs,
     required this.tasksBox,
@@ -562,11 +554,13 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   late DateTime _selectedDate;
-  late String _selectedTaskType; // Changed from event
+  late String _selectedTaskType;
   late List<String> _selectedPigTags;
+  late Pigpen? _selectedPigpen;
+  late bool _assignToAllPigsInPen;
+  late List<Pig> _pigsInSelectedPen;
 
   final List<String> _taskTypes = [
-    // Changed from event
     'Health',
     'Breeding',
     'Feeding',
@@ -577,15 +571,16 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(
-        text: widget.existingTask?.name ?? ''); // Changed from event
-    _descriptionController = TextEditingController(
-        text: widget.existingTask?.description ?? ''); // Changed from event
-    _selectedDate =
-        widget.existingTask?.date ?? DateTime.now(); // Changed from event
-    _selectedTaskType =
-        widget.existingTask?.taskType ?? 'Health'; // Changed from event
+    _nameController =
+        TextEditingController(text: widget.existingTask?.name ?? '');
+    _descriptionController =
+        TextEditingController(text: widget.existingTask?.description ?? '');
+    _selectedDate = widget.existingTask?.date ?? DateTime.now();
+    _selectedTaskType = widget.existingTask?.taskType ?? 'Health';
     _selectedPigTags = List.from(widget.initialSelectedPigs);
+    _assignToAllPigsInPen = false;
+    _pigsInSelectedPen = [];
+    _selectedPigpen = null;
   }
 
   @override
@@ -595,18 +590,26 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
     super.dispose();
   }
 
+  void _updatePigsList(Pigpen? pigpen) {
+    setState(() {
+      _selectedPigpen = pigpen;
+      _pigsInSelectedPen = pigpen?.pigs.toList() ?? [];
+      if (_assignToAllPigsInPen) {
+        _selectedPigTags = _pigsInSelectedPen.map((pig) => pig.tag).toList();
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.existingTask != null
-            ? "Edit Task"
-            : "Add Task"), // Changed from event
+        title: Text(widget.existingTask != null ? "Edit Task" : "Add Task"),
         actions: [
           if (widget.existingTask != null)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _confirmDeleteTask, // Changed from event
+              onPressed: _confirmDeleteTask,
             ),
         ],
       ),
@@ -619,7 +622,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
               TextFormField(
                 controller: _nameController,
                 decoration: const InputDecoration(
-                  labelText: "Task Name *", // Changed from event
+                  labelText: "Task Name *",
                   border: OutlineInputBorder(),
                 ),
                 validator: (value) =>
@@ -627,26 +630,26 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
-                value: _selectedTaskType, // Changed from event
+                value: _selectedTaskType,
                 decoration: const InputDecoration(
-                  labelText: "Task Type *", // Changed from event
+                  labelText: "Task Type *",
                   border: OutlineInputBorder(),
                 ),
-                items: _taskTypes // Changed from event
+                items: _taskTypes
                     .map((type) => DropdownMenuItem(
                           value: type,
                           child: Text(type),
                         ))
                     .toList(),
-                onChanged: (value) => setState(
-                    () => _selectedTaskType = value!), // Changed from event
+                onChanged: (value) =>
+                    setState(() => _selectedTaskType = value!),
               ),
               const SizedBox(height: 16),
               InkWell(
                 onTap: () => _selectDate(context),
                 child: InputDecorator(
                   decoration: const InputDecoration(
-                    labelText: "Task Date *", // Changed from event
+                    labelText: "Task Date *",
                     border: OutlineInputBorder(),
                   ),
                   child: Row(
@@ -668,7 +671,9 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
                 maxLines: 3,
               ),
               const SizedBox(height: 16),
-              _buildPigSelection(),
+              _buildPigPenDropdown(),
+              const SizedBox(height: 16),
+              if (_selectedPigpen != null) _buildPigSelection(),
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -681,7 +686,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: _saveTask, // Changed from event
+                      onPressed: _saveTask,
                       child: const Text("Save"),
                     ),
                   ),
@@ -694,57 +699,93 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
     );
   }
 
-  Widget _buildPigSelection() {
+  Widget _buildPigPenDropdown() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Select Pigs *",
+          "Select Pig Pen (Optional)",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: Colors.grey),
-            borderRadius: BorderRadius.circular(8),
+        DropdownButtonFormField<Pigpen>(
+          decoration: const InputDecoration(
+            labelText: "Pig Pen",
+            border: OutlineInputBorder(),
           ),
-          constraints: const BoxConstraints(maxHeight: 200),
-          child: widget.allPigs.isEmpty
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text("No pigs available to select"),
-                  ),
-                )
-              : ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: widget.allPigs.length,
-                  itemBuilder: (context, index) {
-                    final pig = widget.allPigs[index];
-                    return CheckboxListTile(
-                      title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
-                      value: _selectedPigTags.contains(pig.tag),
-                      onChanged: (selected) {
-                        setState(() {
-                          if (selected == true) {
-                            _selectedPigTags.add(pig.tag);
-                          } else {
-                            _selectedPigTags.remove(pig.tag);
-                          }
-                        });
-                      },
-                    );
-                  },
-                ),
+          value: _selectedPigpen,
+          items: widget.allPigpens.map((pen) {
+            return DropdownMenuItem(
+              value: pen,
+              child: Text("${pen.name} (${pen.pigs.length} pigs)"),
+            );
+          }).toList(),
+          onChanged: _updatePigsList,
         ),
-        if (_selectedPigTags.isEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              "Please select at least one pig",
-              style: TextStyle(color: Colors.red, fontSize: 12),
+      ],
+    );
+  }
+
+  Widget _buildPigSelection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        CheckboxListTile(
+          title: const Text("Apply to all pigs in this pen"),
+          value: _assignToAllPigsInPen,
+          onChanged: (value) {
+            setState(() {
+              _assignToAllPigsInPen = value!;
+              if (_assignToAllPigsInPen) {
+                _selectedPigTags =
+                    _pigsInSelectedPen.map((pig) => pig.tag).toList();
+              } else {
+                _selectedPigTags.clear();
+              }
+            });
+          },
+        ),
+        if (!_assignToAllPigsInPen) ...[
+          const SizedBox(height: 8),
+          const Text("Select Pigs:",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 200),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(8),
             ),
+            child: _pigsInSelectedPen.isEmpty
+                ? const Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text("No pigs in this pen"),
+                    ),
+                  )
+                : ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _pigsInSelectedPen.length,
+                    itemBuilder: (context, index) {
+                      final pig = _pigsInSelectedPen[index];
+                      return CheckboxListTile(
+                        title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
+                        value: _selectedPigTags.contains(pig.tag),
+                        onChanged: (selected) {
+                          setState(() {
+                            if (selected == true) {
+                              _selectedPigTags.add(pig.tag);
+                            } else {
+                              _selectedPigTags.remove(pig.tag);
+                            }
+                          });
+                        },
+                      );
+                    },
+                  ),
           ),
+        ],
       ],
     );
   }
@@ -762,18 +803,10 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
   }
 
   Future<void> _saveTask() async {
-    // Changed from event
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedPigTags.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select at least one pig')),
-      );
-      return;
-    }
 
     final task = PigTask(
-      // Changed from event
-      id: widget.existingTask?.id ?? // Changed from event
+      id: widget.existingTask?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
       name: _nameController.text,
       date: _selectedDate,
@@ -781,25 +814,22 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
           ? _descriptionController.text
           : '',
       pigTags: _selectedPigTags,
-      taskType: _selectedTaskType, // Changed from event
-      isCompleted:
-          widget.existingTask?.isCompleted ?? false, // Changed from event
-      completedDate: widget.existingTask?.completedDate, // Changed from event
+      taskType: _selectedTaskType,
+      isCompleted: widget.existingTask?.isCompleted ?? false,
+      completedDate: widget.existingTask?.completedDate,
     );
 
-    Navigator.pop(context, task); // Changed from event
+    Navigator.pop(context, task);
   }
 
   Future<void> _confirmDeleteTask() async {
-    // Changed from event
     if (widget.existingTask == null) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("Confirm Delete"),
-        content: Text(
-            "Delete ${widget.existingTask!.name} task?"), // Changed from event
+        content: Text("Delete ${widget.existingTask!.name} task?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -815,12 +845,11 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
 
     if (confirmed == true) {
       try {
-        await widget.tasksBox
-            .delete(widget.existingTask!.id); // Changed from event
+        await widget.tasksBox.delete(widget.existingTask!.id);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Task successfully deleted'), // Changed from event
+              content: Text('Task successfully deleted'),
               duration: Duration(seconds: 2),
             ),
           );
@@ -830,7 +859,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Error deleting task: $e'), // Changed from event
+              content: Text('Error deleting task: $e'),
               duration: Duration(seconds: 2),
             ),
           );

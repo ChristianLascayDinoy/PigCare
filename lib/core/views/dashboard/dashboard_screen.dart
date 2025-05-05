@@ -273,11 +273,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _navigateToTaskManagement() {
     final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = _pigpenBox.values.toList();
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => TaskManagementScreen(
           allPigs: allPigs,
+          allPigpens: allPigpens, // Add this line to pass the pigpens
           initialSelectedPigs: [],
         ),
       ),
@@ -379,9 +382,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return ValueListenableBuilder(
       valueListenable: _tasksBox.listenable(),
       builder: (context, Box<PigTask> box, _) {
+        final now = DateTime.now();
+        final today = DateTime(now.year, now.month, now.day);
+
+        // Upcoming tasks (future dates)
         final upcomingTasks = box.values
+            .where((task) => !task.isCompleted && task.date.isAfter(today))
+            .length;
+
+        // Pending tasks (due today)
+        final pendingTasks = box.values
             .where((task) =>
-                !task.isCompleted && task.date.isAfter(DateTime.now()))
+                !task.isCompleted &&
+                task.date.year == today.year &&
+                task.date.month == today.month &&
+                task.date.day == today.day)
             .length;
 
         return Row(
@@ -392,15 +407,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
               TextSpan(
                 children: [
                   const TextSpan(text: "Tasks: "),
-                  TextSpan(
-                    text: upcomingTasks > 0
-                        ? "$upcomingTasks Upcoming"
-                        : "All caught up",
-                    style: TextStyle(
-                      fontSize: isSmallScreen ? 14 : 16,
-                      color: upcomingTasks > 0 ? Colors.blue : Colors.green,
+                  if (pendingTasks > 0)
+                    TextSpan(
+                      text: "$pendingTasks Pending",
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.orange, // Use orange for pending tasks
+                      ),
                     ),
-                  ),
+                  if (pendingTasks == 0 && upcomingTasks > 0)
+                    TextSpan(
+                      text: "$upcomingTasks Upcoming",
+                      style: TextStyle(
+                        fontSize: isSmallScreen ? 14 : 16,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  if (pendingTasks == 0 && upcomingTasks == 0)
+                    const TextSpan(
+                      text: "All caught up",
+                      style: TextStyle(
+                        color: Colors.green,
+                      ),
+                    ),
                 ],
               ),
               style: TextStyle(
