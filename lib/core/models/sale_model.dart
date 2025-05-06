@@ -3,7 +3,8 @@ import 'package:hive/hive.dart';
 
 part 'sale_model.g.dart';
 
-@HiveType(typeId: 6) // Make sure this ID is unique in your app
+// models/sale_model.dart
+@HiveType(typeId: 6)
 class Sale {
   @HiveField(0)
   final String id;
@@ -23,6 +24,12 @@ class Sale {
   @HiveField(5)
   final String? description;
 
+  @HiveField(6) // New field
+  final double? weight;
+
+  @HiveField(7) // New field
+  final String? buyerContact;
+
   Sale({
     required this.id,
     required this.pigTag,
@@ -30,6 +37,8 @@ class Sale {
     required this.amount,
     required this.date,
     this.description,
+    this.weight,
+    this.buyerContact,
   });
 
   Sale copyWith({
@@ -39,6 +48,8 @@ class Sale {
     double? amount,
     DateTime? date,
     String? description,
+    double? weight,
+    String? buyerContact,
   }) {
     return Sale(
       id: id ?? this.id,
@@ -47,6 +58,8 @@ class Sale {
       amount: amount ?? this.amount,
       date: date ?? this.date,
       description: description ?? this.description,
+      weight: weight ?? this.weight,
+      buyerContact: buyerContact ?? this.buyerContact,
     );
   }
 }

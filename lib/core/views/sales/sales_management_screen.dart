@@ -8,10 +8,12 @@ import '../../models/pig_model.dart';
 
 class SalesManagementScreen extends StatefulWidget {
   final List<Pig> allPigs;
+  final List<Pigpen> allPigpens;
 
   const SalesManagementScreen({
     super.key,
     required this.allPigs,
+    required this.allPigpens,
   });
 
   @override
@@ -23,6 +25,9 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   List<Sale> _allSales = [];
   String _searchQuery = '';
   bool _isLoading = false;
+  DateTimeRange? _dateRangeFilter;
+  double? _minAmountFilter;
+  double? _maxAmountFilter;
 
   @override
   void initState() {
@@ -69,14 +74,23 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   }
 
   List<Sale> get _filteredSales {
-    if (_searchQuery.isEmpty) return _allSales;
     return _allSales.where((sale) {
-      return sale.pigTag.toLowerCase().contains(_searchQuery.toLowerCase()) ||
+      final matchesSearch = sale.pigTag
+              .toLowerCase()
+              .contains(_searchQuery.toLowerCase()) ||
           sale.buyerName.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           (sale.description
                   ?.toLowerCase()
                   .contains(_searchQuery.toLowerCase()) ??
               false);
+      final matchesDateRange = _dateRangeFilter == null ||
+          (_dateRangeFilter!.start.isBefore(sale.date) &&
+              _dateRangeFilter!.end.isAfter(sale.date));
+      final matchesAmountRange =
+          (_minAmountFilter == null || sale.amount >= _minAmountFilter!) &&
+              (_maxAmountFilter == null || sale.amount <= _maxAmountFilter!);
+
+      return matchesSearch && matchesDateRange && matchesAmountRange;
     }).toList()
       ..sort((a, b) => b.date.compareTo(a.date));
   }
@@ -106,8 +120,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
               child: Image.asset(
@@ -126,29 +139,16 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: () => _showAddSaleDialog(),
-            tooltip: 'Add new sale',
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddSaleDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Sale'),
+        backgroundColor: Colors.green[700],
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: 'Search sales...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                ),
-              ),
-              onChanged: (value) => setState(() => _searchQuery = value),
-            ),
-          ),
+          _buildSearchAndFilter(),
           Expanded(
             child: _isLoading ? _buildLoadingIndicator() : _buildSalesList(),
           ),
@@ -163,15 +163,89 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     );
   }
 
+  Widget _buildSearchAndFilter() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  decoration: InputDecoration(
+                    hintText: 'Search sales...',
+                    prefixIcon: const Icon(Icons.search),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8.0),
+                    ),
+                  ),
+                  onChanged: (value) => setState(() => _searchQuery = value),
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: const Icon(Icons.filter_alt),
+                onPressed: _showAdvancedFilters,
+                tooltip: 'Advanced filters',
+              ),
+            ],
+          ),
+          if (_dateRangeFilter != null ||
+              _minAmountFilter != null ||
+              _maxAmountFilter != null) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                if (_dateRangeFilter != null)
+                  Chip(
+                    label: Text(
+                        '${DateFormat('MMM d').format(_dateRangeFilter!.start)} - ${DateFormat('MMM d').format(_dateRangeFilter!.end)}'),
+                    onDeleted: () => setState(() => _dateRangeFilter = null),
+                  ),
+                if (_minAmountFilter != null)
+                  Chip(
+                    label:
+                        Text('Min: ₱${_minAmountFilter!.toStringAsFixed(2)}'),
+                    onDeleted: () => setState(() => _minAmountFilter = null),
+                  ),
+                if (_maxAmountFilter != null)
+                  Chip(
+                    label:
+                        Text('Max: ₱${_maxAmountFilter!.toStringAsFixed(2)}'),
+                    onDeleted: () => setState(() => _maxAmountFilter = null),
+                  ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSalesList() {
     if (_filteredSales.isEmpty) {
       return Center(
-        child: Text(
-          _searchQuery.isEmpty
-              ? "No sales found\nAdd your first sale!"
-              : "No sales match your search",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, color: Colors.grey),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'lib/assets/images/sales.png',
+              width: 64,
+              height: 64,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchQuery.isEmpty &&
+                      _dateRangeFilter == null &&
+                      _minAmountFilter == null &&
+                      _maxAmountFilter == null
+                  ? "No sales found\nAdd your first sale!"
+                  : "No sales match your search/filters",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          ],
         ),
       );
     }
@@ -230,13 +304,26 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
                       ),
                     ),
                   ),
-                  Text(
-                    NumberFormat.currency(symbol: '₱').format(sale.amount),
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green[700],
-                    ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        NumberFormat.currency(symbol: '₱').format(sale.amount),
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green[700],
+                        ),
+                      ),
+                      if (sale.weight != null)
+                        Text(
+                          '${sale.weight!.toStringAsFixed(1)} kg',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
                   ),
                 ],
               ),
@@ -268,21 +355,56 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
                 ),
               ],
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showEditSaleDialog(sale),
-                    tooltip: 'Edit sale',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                    onPressed: () => _confirmDeleteSale(sale),
-                    tooltip: 'Delete sale',
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'view':
+                        _showSaleDetails(sale, pig);
+                        break;
+                      case 'edit':
+                        _showEditSaleDialog(sale);
+                        break;
+                      case 'delete':
+                        _confirmDeleteSale(sale);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'view',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.visibility, size: 18, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('View Details'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.edit, size: 18, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -292,10 +414,14 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   }
 
   Future<void> _showAddSaleDialog() async {
-    final result = await showDialog<Sale>(
-      context: context,
-      builder: (context) => _AddEditSaleDialog(
-        allPigs: widget.allPigs,
+    final result = await Navigator.push<Sale>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditSaleDialog(
+          allPigs: widget.allPigs,
+          allPigpens: widget.allPigpens,
+        ),
+        fullscreenDialog: true,
       ),
     );
 
@@ -305,11 +431,14 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
   }
 
   Future<void> _showEditSaleDialog(Sale sale) async {
-    final result = await showDialog<Sale>(
-      context: context,
-      builder: (context) => _AddEditSaleDialog(
-        allPigs: widget.allPigs,
-        existingSale: sale,
+    final result = await Navigator.push<Sale>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AddEditSaleDialog(
+          allPigs: widget.allPigs,
+          allPigpens: widget.allPigpens,
+          existingSale: sale,
+        ),
       ),
     );
 
@@ -320,12 +449,8 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
 
   Future<void> _saveSale(Sale sale) async {
     try {
-      // Save the sale
       await _salesBox.put(sale.id, sale);
-
-      // Remove the pig from pig management
       await _removeSoldPig(sale.pigTag);
-
       await _loadSales();
       _showSuccessSnackbar('Sale saved and pig removed successfully');
     } catch (e) {
@@ -350,6 +475,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     }
   }
 
+  // In the _showSaleDetails method
   Future<void> _showSaleDetails(Sale sale, Pig pig) async {
     await showDialog(
       context: context,
@@ -360,8 +486,14 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildDetailRow('Pig', pig.tag),
+              _buildDetailRow('Pig Tag', pig.tag),
+              if (pig.name != null) _buildDetailRow('Pig Name', pig.name!),
               _buildDetailRow('Buyer', sale.buyerName),
+              if (sale.buyerContact != null)
+                _buildDetailRow('Buyer Contact', sale.buyerContact!),
+              if (sale.weight != null)
+                _buildDetailRow(
+                    'Weight', '${sale.weight!.toStringAsFixed(2)} kg'),
               _buildDetailRow('Amount',
                   NumberFormat.currency(symbol: '₱').format(sale.amount)),
               _buildDetailRow('Date', DateFormat.yMMMd().format(sale.date)),
@@ -422,28 +554,115 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
       await _deleteSale(sale);
     }
   }
+
+  Future<void> _showAdvancedFilters() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text("Advanced Filters"),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    title: const Text("Date Range"),
+                    subtitle: Text(_dateRangeFilter == null
+                        ? "Select date range"
+                        : "${DateFormat.yMd().format(_dateRangeFilter!.start)} - ${DateFormat.yMd().format(_dateRangeFilter!.end)}"),
+                    trailing: const Icon(Icons.calendar_today),
+                    onTap: () async {
+                      final picked = await showDateRangePicker(
+                        context: context,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                        initialDateRange: _dateRangeFilter,
+                      );
+                      if (picked != null) {
+                        setState(() => _dateRangeFilter = picked);
+                      }
+                    },
+                  ),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: "Minimum Amount",
+                      prefixText: "₱",
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) => setState(
+                        () => _minAmountFilter = double.tryParse(value)),
+                  ),
+                  TextField(
+                    decoration: const InputDecoration(
+                      labelText: "Maximum Amount",
+                      prefixText: "₱",
+                    ),
+                    keyboardType: TextInputType.number,
+                    onChanged: (value) => setState(
+                        () => _maxAmountFilter = double.tryParse(value)),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text("Clear All"),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text("Apply"),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (result != null) {
+      setState(() {
+        if (!result) {
+          // Clear all filters if "Clear All" was pressed
+          _dateRangeFilter = null;
+          _minAmountFilter = null;
+          _maxAmountFilter = null;
+        }
+        // Otherwise keep the filters that were set
+      });
+    }
+  }
 }
 
-class _AddEditSaleDialog extends StatefulWidget {
+// Update the AddEditSaleDialog class
+class AddEditSaleDialog extends StatefulWidget {
   final List<Pig> allPigs;
+  final List<Pigpen> allPigpens;
   final Sale? existingSale;
 
-  const _AddEditSaleDialog({
+  const AddEditSaleDialog({
+    super.key,
     required this.allPigs,
+    required this.allPigpens,
     this.existingSale,
   });
 
   @override
-  State<_AddEditSaleDialog> createState() => __AddEditSaleDialogState();
+  State<AddEditSaleDialog> createState() => _AddEditSaleDialogState();
 }
 
-class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
+class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _buyerNameController;
   late TextEditingController _amountController;
   late TextEditingController _descriptionController;
+  late TextEditingController _weightController;
+  late TextEditingController _buyerContactController;
+
   late DateTime _selectedDate;
-  late String? _selectedPigTag;
+  late Pigpen? _selectedPigpen;
+  late Pig? _selectedPig;
+  late List<Pig> _pigsInSelectedPen;
 
   @override
   void initState() {
@@ -454,45 +673,138 @@ class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
         text: widget.existingSale?.amount.toString() ?? '');
     _descriptionController =
         TextEditingController(text: widget.existingSale?.description ?? '');
+    _weightController = TextEditingController(
+        text: widget.existingSale?.weight?.toString() ?? '');
+    _buyerContactController =
+        TextEditingController(text: widget.existingSale?.buyerContact ?? '');
     _selectedDate = widget.existingSale?.date ?? DateTime.now();
-    _selectedPigTag = widget.existingSale?.pigTag;
+    _selectedPigpen = null;
+    _selectedPig = null;
+    _pigsInSelectedPen = [];
+
+    // Initialize with existing sale data if editing
+    if (widget.existingSale != null) {
+      final existingPig = widget.allPigs.firstWhere(
+        (pig) => pig.tag == widget.existingSale!.pigTag,
+        orElse: () => Pig(
+            tag: widget.existingSale!.pigTag,
+            name: 'Unknown',
+            breed: '',
+            gender: 'Female',
+            dob: '',
+            doe: '',
+            source: '',
+            stage: '',
+            weight: 0),
+      );
+
+      // Find which pen the pig is in
+      for (final pigpen in widget.allPigpens) {
+        if (pigpen.pigs.any((pig) => pig.tag == existingPig.tag)) {
+          _selectedPigpen = pigpen;
+          _pigsInSelectedPen = pigpen.pigs.toList();
+          _selectedPig = existingPig;
+          break;
+        }
+      }
+    }
   }
 
-  @override
-  void dispose() {
-    _buyerNameController.dispose();
-    _amountController.dispose();
-    _descriptionController.dispose();
-    super.dispose();
+  void _updatePigsList(Pigpen? pigpen) {
+    setState(() {
+      _selectedPigpen = pigpen;
+      _pigsInSelectedPen = pigpen?.pigs.toList() ?? [];
+      _selectedPig = null; // Reset selected pig when changing pen
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.existingSale != null ? "Edit Sale" : "Add Sale"),
-      content: SingleChildScrollView(
+    final isEditing = widget.existingSale != null;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(isEditing ? "Edit Sale" : "Add Sale"),
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
         child: Form(
           key: _formKey,
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              DropdownButtonFormField<String>(
-                value: _selectedPigTag,
-                decoration: const InputDecoration(
-                  labelText: "Pig *",
-                  border: OutlineInputBorder(),
+              // Pigpen selection - disabled when editing
+              AbsorbPointer(
+                absorbing: isEditing,
+                child: DropdownButtonFormField<Pigpen>(
+                  value: _selectedPigpen,
+                  decoration: InputDecoration(
+                    labelText: "Pig Pen *",
+                    border: const OutlineInputBorder(),
+                    filled: isEditing,
+                    fillColor: isEditing ? Colors.grey[200] : null,
+                  ),
+                  items: widget.allPigpens
+                      .map((pen) => DropdownMenuItem(
+                            value: pen,
+                            child:
+                                Text("${pen.name} (${pen.pigs.length} pigs)"),
+                          ))
+                      .toList(),
+                  onChanged: _updatePigsList,
+                  validator: (value) =>
+                      value == null ? 'Please select a pig pen' : null,
                 ),
-                items: widget.allPigs.map((pig) {
-                  return DropdownMenuItem(
-                    value: pig.tag,
-                    child: Text("Tag: ${pig.tag}"),
-                  );
-                }).toList(),
-                onChanged: (value) => setState(() => _selectedPigTag = value),
-                validator: (value) =>
-                    value == null ? 'Please select a pig' : null,
               ),
               const SizedBox(height: 16),
+
+              // Pig selection - disabled when editing
+              if (_selectedPigpen != null)
+                AbsorbPointer(
+                  absorbing: isEditing,
+                  child: DropdownButtonFormField<Pig>(
+                    value: _selectedPig,
+                    decoration: InputDecoration(
+                      labelText: "Pig *",
+                      border: const OutlineInputBorder(),
+                      filled: isEditing,
+                      fillColor: isEditing ? Colors.grey[200] : null,
+                    ),
+                    items: _pigsInSelectedPen.map((pig) {
+                      return DropdownMenuItem(
+                        value: pig,
+                        child: Text(
+                            "Tag: ${pig.tag} - (${pig.name ?? 'No name'})"),
+                      );
+                    }).toList(),
+                    onChanged: (pig) => setState(() => _selectedPig = pig),
+                    validator: (value) =>
+                        value == null ? 'Please select a pig' : null,
+                  ),
+                ),
+              const SizedBox(height: 16),
+
+              TextFormField(
+                controller: _weightController,
+                decoration: const InputDecoration(
+                  labelText: "Weight (kg) *",
+                  border: OutlineInputBorder(),
+                  suffixText: 'kg',
+                ),
+                keyboardType: TextInputType.number,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Required field';
+                  }
+                  final weight = double.tryParse(value);
+                  if (weight == null || weight <= 0) {
+                    return 'Enter valid weight';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // Buyer Name (unchanged)
               TextFormField(
                 controller: _buyerNameController,
                 decoration: const InputDecoration(
@@ -501,6 +813,18 @@ class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
                 ),
                 validator: (value) =>
                     value?.isEmpty ?? true ? 'Required field' : null,
+              ),
+              const SizedBox(height: 16),
+
+              // New: Buyer Contact
+              TextFormField(
+                controller: _buyerContactController,
+                decoration: const InputDecoration(
+                  labelText: "Buyer Contact (Optional)",
+                  border: OutlineInputBorder(),
+                  hintText: "Phone number or other contact info",
+                ),
+                keyboardType: TextInputType.phone,
               ),
               const SizedBox(height: 16),
               TextFormField(
@@ -548,20 +872,28 @@ class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
                 ),
                 maxLines: 3,
               ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text("Cancel"),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: _saveSale,
+                      child: const Text("Save"),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text("Cancel"),
-        ),
-        ElevatedButton(
-          onPressed: _saveSale,
-          child: const Text("Save"),
-        ),
-      ],
     );
   }
 
@@ -579,20 +911,50 @@ class __AddEditSaleDialogState extends State<_AddEditSaleDialog> {
 
   void _saveSale() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedPigTag == null) return;
+    if (_selectedPig == null) return;
 
     final sale = Sale(
       id: widget.existingSale?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      pigTag: _selectedPigTag!,
+      pigTag: _selectedPig!.tag,
       buyerName: _buyerNameController.text,
       amount: double.parse(_amountController.text),
       date: _selectedDate,
       description: _descriptionController.text.isEmpty
           ? null
           : _descriptionController.text,
+      weight: double.parse(_weightController.text),
+      buyerContact: _buyerContactController.text.isEmpty
+          ? null
+          : _buyerContactController.text,
     );
 
     Navigator.pop(context, sale);
+  }
+
+  Future<void> _confirmDeleteSale() async {
+    if (widget.existingSale == null) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: Text("Delete sale of ${widget.existingSale!.pigTag}?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      Navigator.pop(context, true);
+    }
   }
 }

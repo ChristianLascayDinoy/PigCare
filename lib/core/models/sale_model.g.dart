@@ -23,13 +23,15 @@ class SaleAdapter extends TypeAdapter<Sale> {
       amount: fields[3] as double,
       date: fields[4] as DateTime,
       description: fields[5] as String?,
+      weight: fields[6] as double?,
+      buyerContact: fields[7] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, Sale obj) {
     writer
-      ..writeByte(6)
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -41,7 +43,11 @@ class SaleAdapter extends TypeAdapter<Sale> {
       ..writeByte(4)
       ..write(obj.date)
       ..writeByte(5)
-      ..write(obj.description);
+      ..write(obj.description)
+      ..writeByte(6)
+      ..write(obj.weight)
+      ..writeByte(7)
+      ..write(obj.buyerContact);
   }
 
   @override

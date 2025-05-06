@@ -253,19 +253,12 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
-        actions: [
-          TextButton.icon(
-            onPressed: () => _showAddPigDialog(),
-            icon: const Icon(Icons.add, color: Colors.white),
-            label: const Text(
-              'Add Pig',
-              style: TextStyle(color: Colors.white),
-            ),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddPigDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Pig'),
+        backgroundColor: Colors.green[700],
       ),
       body: Column(
         children: [

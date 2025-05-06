@@ -297,40 +297,34 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-          title: Row(
-            mainAxisSize:
-                MainAxisSize.min, // <-- this helps center the Row contents
-            children: [
-              ClipOval(
-                child: Image.asset(
-                  'lib/assets/images/pigpen.png',
-                  height: 40,
-                  width: 40,
-                  fit: BoxFit.cover,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                "Pigpen Management",
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          centerTitle: true,
-          backgroundColor: Colors.green[700],
-          actions: [
-            TextButton.icon(
-              onPressed: () => _showAddEditDialog(),
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Add Pigpen',
-                style: TextStyle(color: Colors.white),
-              ),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.white,
+        title: Row(
+          mainAxisSize:
+              MainAxisSize.min, // <-- this helps center the Row contents
+          children: [
+            ClipOval(
+              child: Image.asset(
+                'lib/assets/images/pigpen.png',
+                height: 40,
+                width: 40,
+                fit: BoxFit.cover,
               ),
             ),
-          ]),
+            const SizedBox(width: 8),
+            const Text(
+              "Pigpen Management",
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.green[700],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddEditDialog,
+        icon: const Icon(Icons.add),
+        label: const Text('Add Pigpen'),
+        backgroundColor: Colors.green[700],
+      ),
       body: Column(
         children: [
           Padding(

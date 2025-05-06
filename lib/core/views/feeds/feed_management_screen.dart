@@ -529,7 +529,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                           );
                         },
                         icon: const Icon(Icons.schedule),
-                        label: const Text("Schedule"),
+                        label: const Text("Feeding Schedules"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
@@ -550,10 +550,10 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(
-                              Icons.inventory_2_outlined,
-                              size: 64,
-                              color: Theme.of(context).disabledColor,
+                            Image.asset(
+                              'lib/assets/images/feed.png',
+                              width: 64,
+                              height: 64,
                             ),
                             const SizedBox(height: 16),
                             Text(

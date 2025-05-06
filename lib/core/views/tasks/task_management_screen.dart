@@ -199,12 +199,23 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Widget _buildTaskList() {
     if (_filteredTasks.isEmpty) {
       return Center(
-        child: Text(
-          _searchQuery.isEmpty
-              ? "No tasks found\nAdd your first task!"
-              : "No tasks match your search",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, color: Colors.grey),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'lib/assets/images/task.png',
+              width: 64,
+              height: 64,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchQuery.isEmpty
+                  ? "No tasks found\nAdd your first task!"
+                  : "No tasks match your search",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          ],
         ),
       );
     }
@@ -704,7 +715,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Select Pig Pen (Optional)",
+          "Select Pig for this Task (Optional)",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),

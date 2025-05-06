@@ -338,14 +338,25 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
   Widget _buildExpenseList() {
     if (_filteredExpenses.isEmpty) {
       return Center(
-        child: Text(
-          _searchQuery.isEmpty &&
-                  _filterCategory == 'All' &&
-                  _dateRangeFilter == null
-              ? "No expenses found\nAdd your first expense!"
-              : "No expenses match your search/filters",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 18, color: Colors.grey),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'lib/assets/images/expenses.png',
+              width: 64,
+              height: 64,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _searchQuery.isEmpty &&
+                      _filterCategory == 'All' &&
+                      _dateRangeFilter == null
+                  ? "No expenses found\nAdd your first expense!"
+                  : "No expenses match your search/filters",
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          ],
         ),
       );
     }
@@ -446,21 +457,56 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.edit, size: 20),
-                    onPressed: () => _showEditExpenseDialog(expense),
-                    tooltip: 'Edit expense',
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 20, color: Colors.red),
-                    onPressed: () => _deleteExpense(expense),
-                    tooltip: 'Delete expense',
-                  ),
-                ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'view':
+                        _showExpenseDetails(expense);
+                        break;
+                      case 'edit':
+                        _showEditExpenseDialog(expense);
+                        break;
+                      case 'delete':
+                        _deleteExpense(expense);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'view',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.visibility, size: 18, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('View Details'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.edit, size: 18, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete, size: 18, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete'),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
@@ -784,13 +830,6 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
       appBar: AppBar(
         title: Text(
             widget.existingExpense != null ? "Edit Expense" : "Add Expense"),
-        actions: [
-          if (widget.existingExpense != null)
-            IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _confirmDeleteExpense,
-            ),
-        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -906,7 +945,7 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          "Select Pig Pen (Optional)",
+          "Select Pig for this Expense (Optional)",
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),

@@ -298,11 +298,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _navigateToSalesManagement() {
-    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final pigpenBox = Hive.box<Pigpen>('pigpens');
+    final allPigs = pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = pigpenBox.values.toList();
+
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => SalesManagementScreen(allPigs: allPigs),
+        builder: (context) => SalesManagementScreen(
+          allPigs: allPigs,
+          allPigpens: allPigpens,
+        ),
       ),
     );
   }
