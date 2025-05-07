@@ -44,6 +44,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, dynamic> salesReports = {};
   Map<String, dynamic> financialSummary = {};
 
+  // Custom icons map
+  final Map<String, String> reportIcons = {
+    'Pig Reports': 'lib/assets/images/pig.png',
+    'Feed Reports': 'lib/assets/images/feed.png',
+    'Task Reports': 'lib/assets/images/task.png',
+    'Expense Reports': 'lib/assets/images/expenses.png',
+    'Sales Reports': 'lib/assets/images/sales.png',
+    'Financial Summary': 'lib/assets/images/expenses.png',
+  };
+
   @override
   void initState() {
     super.initState();
@@ -78,16 +88,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
         _calculateTaskReports(),
         _calculateExpenseReports(),
         _calculateSalesReports(),
-        _calculateFinancialSummary(), // Add this line
+        _calculateFinancialSummary(),
       ]);
 
       setState(() {
-        pigReports = results[0];
-        feedReports = results[1];
-        taskReports = results[2];
-        expenseReports = results[3];
-        salesReports = results[4];
-        financialSummary = results[5]; // Add this line
+        pigReports = results[0] ?? {};
+        feedReports = results[1] ?? {};
+        taskReports = results[2] ?? {};
+        expenseReports = results[3] ?? {};
+        salesReports = results[4] ?? {};
+        financialSummary = results[5] ?? {};
       });
     } catch (e) {
       if (mounted) {
@@ -390,15 +400,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Future<void> _exportReports() async {
     try {
-      // Create a PDF document
       final pdf = pw.Document();
 
-      // Add a page to the PDF
       pdf.addPage(
         pw.MultiPage(
           pageFormat: PdfPageFormat.a4,
           build: (pw.Context context) => [
-            // Header
             pw.Header(
               level: 0,
               child: pw.Text('Farm Reports',
@@ -411,31 +418,44 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 'Date Range: ${DateFormat('MMM dd, yyyy').format(_dateRange.start)} - ${DateFormat('MMM dd, yyyy').format(_dateRange.end)}'),
             pw.SizedBox(height: 20),
 
-            // Pig Report Section
-            _buildPdfReportSection('Pig Report', _buildPigReportPdfContent()),
+            // Always include all reports in PDF
+            _buildPdfReportSection(
+                'Pig Report',
+                pigReports.isEmpty
+                    ? pw.Text('No pig data available')
+                    : _buildPigReportPdfContent()),
             pw.SizedBox(height: 20),
 
-            // Financial Summary Section
             _buildPdfReportSection(
                 'Financial Summary', _buildFinancialSummaryPdfContent()),
             pw.SizedBox(height: 20),
 
-            // Feed Report Section
-            _buildPdfReportSection('Feed Report', _buildFeedReportPdfContent()),
-            pw.SizedBox(height: 20),
-
-            // Task Report Section
-            _buildPdfReportSection('Task Report', _buildTaskReportPdfContent()),
-            pw.SizedBox(height: 20),
-
-            // Expense Report Section
             _buildPdfReportSection(
-                'Expense Report', _buildExpenseReportPdfContent()),
+                'Feed Report',
+                feedReports.isEmpty
+                    ? pw.Text('No feed data available')
+                    : _buildFeedReportPdfContent()),
             pw.SizedBox(height: 20),
 
-            // Sales Report Section
             _buildPdfReportSection(
-                'Sales Report', _buildSalesReportPdfContent()),
+                'Task Report',
+                taskReports.isEmpty
+                    ? pw.Text('No task data available')
+                    : _buildTaskReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            _buildPdfReportSection(
+                'Expense Report',
+                expenseReports.isEmpty
+                    ? pw.Text('No expense data available')
+                    : _buildExpenseReportPdfContent()),
+            pw.SizedBox(height: 20),
+
+            _buildPdfReportSection(
+                'Sales Report',
+                salesReports.isEmpty
+                    ? pw.Text('No sales data available')
+                    : _buildSalesReportPdfContent()),
           ],
         ),
       );
@@ -715,92 +735,93 @@ class _ReportsScreenState extends State<ReportsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
-          children: [
-            ClipOval(
-              child: Image.asset(
-                'lib/assets/images/reports.png',
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
+        appBar: AppBar(
+          title: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipOval(
+                child: Image.asset(
+                  'lib/assets/images/reports.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
+                ),
               ),
+              const SizedBox(width: 8),
+              const Text(
+                "Farm Reports",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.green[700],
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_today),
+              onPressed: () => _selectDateRange(context),
+              tooltip: 'Select date range',
             ),
-            const SizedBox(width: 8),
-            const Text(
-              "Farm Reports",
-              style: TextStyle(fontWeight: FontWeight.bold),
+            IconButton(
+              icon: const Icon(Icons.download),
+              onPressed: _exportReports,
+              tooltip: 'Export reports',
             ),
           ],
         ),
-        centerTitle: true,
-        backgroundColor: Colors.green[700],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
-            onPressed: () => _selectDateRange(context),
-            tooltip: 'Select date range',
-          ),
-          IconButton(
-            icon: const Icon(Icons.download),
-            onPressed: _exportReports,
-            tooltip: 'Export reports',
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadReports,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _buildDateRangeHeader(),
-                    const SizedBox(height: 20),
-                    _buildReportCard(
-                      title: "Pig Reports",
-                      icon: Icons.pets,
-                      data: pigReports,
-                      buildContent: _buildPigReportContent,
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _loadReports,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(16),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildDateRangeHeader(),
+                        const SizedBox(height: 20),
+                        _buildReportCard(
+                          title: "Pig Reports",
+                          iconPath: reportIcons['Pig Reports']!,
+                          data: pigReports,
+                          buildContent: _buildPigReportContent,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildReportCard(
+                          title: "Feed Reports",
+                          iconPath: reportIcons['Feed Reports']!,
+                          data: feedReports,
+                          buildContent: _buildFeedReportContent,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildReportCard(
+                          title: "Task Reports",
+                          iconPath: reportIcons['Task Reports']!,
+                          data: taskReports,
+                          buildContent: _buildTaskReportContent,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildReportCard(
+                          title: "Expense Reports",
+                          iconPath: reportIcons['Expense Reports']!,
+                          data: expenseReports,
+                          buildContent: _buildExpenseReportContent,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildReportCard(
+                          title: "Sales Reports",
+                          iconPath: reportIcons['Sales Reports']!,
+                          data: salesReports,
+                          buildContent: _buildSalesReportContent,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildFinancialSummaryCard(),
+                      ],
                     ),
-                    const SizedBox(height: 16),
-                    _buildReportCard(
-                      title: "Feed Reports",
-                      icon: Icons.fastfood,
-                      data: feedReports,
-                      buildContent: _buildFeedReportContent,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildReportCard(
-                      title: "Task Reports",
-                      icon: Icons.task,
-                      data: taskReports,
-                      buildContent: _buildTaskReportContent,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildReportCard(
-                      title: "Expense Reports",
-                      icon: Icons.attach_money,
-                      data: expenseReports,
-                      buildContent: _buildExpenseReportContent,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildReportCard(
-                      title: "Sales Reports",
-                      icon: Icons.shopping_cart,
-                      data: salesReports,
-                      buildContent: _buildSalesReportContent,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildFinancialSummaryCard(), // Add this new card
-                  ],
-                ),
-              ),
-            ),
-    );
+                  ),
+                )));
   }
 
   Widget _buildDateRangeHeader() {
@@ -831,13 +852,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   Widget _buildReportCard({
     required String title,
-    required IconData icon,
+    required String iconPath,
     required Map<String, dynamic> data,
     required Widget Function(Map<String, dynamic>) buildContent,
   }) {
-    final isEmpty =
-        data.isEmpty || (data['total'] != null && data['total'] == 0);
-
     return Card(
       elevation: 4,
       shape: RoundedRectangleBorder(
@@ -846,11 +864,18 @@ class _ReportsScreenState extends State<ReportsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          // ✅ Wrap multiple widgets here
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(icon, size: 28, color: Colors.green[700]),
+                Image.asset(
+                  iconPath,
+                  width: 28,
+                  height: 28,
+                  errorBuilder: (context, error, stackTrace) =>
+                      const Icon(Icons.error_outline),
+                ),
                 const SizedBox(width: 12),
                 Text(
                   title,
@@ -862,11 +887,15 @@ class _ReportsScreenState extends State<ReportsScreen> {
               ],
             ),
             const Divider(height: 24, thickness: 1),
-            if (isEmpty)
+            if (data.isEmpty)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 16),
-                child: Text('No data available for this period',
-                    style: TextStyle(color: Colors.grey)),
+                child: Center(
+                  child: Text(
+                    'No data available for this period',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ),
               )
             else
               buildContent(data),
@@ -1266,7 +1295,11 @@ class _ReportsScreenState extends State<ReportsScreen> {
           children: [
             Row(
               children: [
-                Icon(Icons.attach_money, size: 28, color: Colors.green[700]),
+                Image.asset(
+                  reportIcons['Financial Summary']!,
+                  width: 28,
+                  height: 28,
+                ),
                 const SizedBox(width: 12),
                 const Text(
                   "Financial Summary",
@@ -1290,22 +1323,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
               _buildReportItem(
                 "Total Sales",
                 NumberFormat.currency(symbol: '₱')
-                    .format(financialSummary['totalSales']),
+                    .format(financialSummary['totalSales'] ?? 0),
               ),
               _buildReportItem(
                 "Total Expenses",
                 NumberFormat.currency(symbol: '₱')
-                    .format(financialSummary['totalExpenses']),
+                    .format(financialSummary['totalExpenses'] ?? 0),
               ),
               _buildReportItem(
                 "Net Profit",
                 NumberFormat.currency(symbol: '₱')
-                    .format(financialSummary['netProfit']),
+                    .format(financialSummary['netProfit'] ?? 0),
                 tooltip: 'Sales minus Expenses',
               ),
               _buildReportItem(
                 "Profit Margin",
-                "${financialSummary['profitMargin'].toStringAsFixed(2)}%",
+                "${(financialSummary['profitMargin'] ?? 0).toStringAsFixed(2)}%",
                 tooltip: 'Net Profit as percentage of Sales',
               ),
             ],

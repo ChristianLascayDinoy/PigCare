@@ -178,6 +178,33 @@ class Pig extends HiveObject {
       return false;
     }
   }
+
+  // ===============================
+  // New Logic: Estimated Weight & Stage
+  // ===============================
+  double get estimatedWeight {
+    final ageInDays = age;
+
+    if (ageInDays <= 21) return _lerp(1.5, 7, ageInDays / 21);
+    if (ageInDays <= 56) return _lerp(7, 25, (ageInDays - 21) / 35);
+    if (ageInDays <= 112) return _lerp(25, 60, (ageInDays - 56) / 56);
+    if (ageInDays <= 180) return _lerp(60, 100, (ageInDays - 112) / 68);
+    return 100 + (ageInDays - 180) * 0.5;
+  }
+
+  String get estimatedStage {
+    final ageInDays = age;
+
+    if (ageInDays <= 21) return 'Piglet';
+    if (ageInDays <= 56) return 'Weaner';
+    if (ageInDays <= 112) return 'Grower';
+    if (ageInDays <= 180) return 'Finisher';
+    return gender == 'Male' ? 'Boar' : 'Sow';
+  }
+
+  double _lerp(double a, double b, double t) {
+    return a + (b - a) * t;
+  }
 }
 
 extension FirstWhereOrNullExtension<E> on Iterable<E> {

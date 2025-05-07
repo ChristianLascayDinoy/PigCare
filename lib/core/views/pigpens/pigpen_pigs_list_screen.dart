@@ -109,7 +109,11 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      "${pig.weight} kg",
+                      "${pig.weight} kg (est. ${pig.estimatedWeight.toStringAsFixed(1)} kg)",
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    Text(
+                      "${pig.stage} (est. ${pig.estimatedStage})",
                       style: const TextStyle(fontSize: 12),
                     ),
                   ],

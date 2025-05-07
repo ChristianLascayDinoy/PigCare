@@ -4,6 +4,7 @@ import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
 import 'package:pigcare/core/models/task_model.dart';
+import 'package:pigcare/core/models/feeding_schedule_model.dart';
 import 'package:pigcare/core/views/feeds/feed_management_screen.dart';
 import 'package:pigcare/core/views/pigs/pig_management_screen.dart';
 import 'package:pigcare/core/views/pigpens/pigpen_management_screen.dart';
@@ -25,26 +26,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   late Box<Pigpen> _pigpenBox;
   late Box<Feed> _feedsBox;
   late Box<PigTask> _tasksBox;
+  late Box<FeedingSchedule> _feedingScheduleBox;
   int _totalPigs = 0;
   final double _lowStockThreshold = 10.0;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _initializeHiveBoxes();
-    _setupListeners();
   }
 
   Future<void> _initializeHiveBoxes() async {
-    _pigpenBox = Hive.box<Pigpen>('pigpens');
-    _feedsBox = Hive.box<Feed>('feedsBox');
-    _tasksBox = Hive.box<PigTask>('pig_tasks');
-    await _loadTotalPigs();
-  }
-
-  void _setupListeners() {
-    _pigpenBox.listenable().addListener(_loadTotalPigs);
-    _tasksBox.listenable().addListener(_updateDashboard);
+    try {
+      _pigpenBox = await Hive.openBox<Pigpen>('pigpens');
+      _feedsBox = await Hive.openBox<Feed>('feedsBox');
+      _tasksBox = await Hive.openBox<PigTask>('pig_tasks');
+      _feedingScheduleBox =
+          await Hive.openBox<FeedingSchedule>('feedingSchedules');
+      await _loadTotalPigs();
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error initializing data: ${e.toString()}')),
+      );
+    }
   }
 
   Future<void> _loadTotalPigs() async {
@@ -60,21 +67,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  void _updateDashboard() {
-    if (mounted) {
-      setState(() {});
-    }
+  int _getUpcomingFeedingSchedulesCount() {
+    if (!_feedingScheduleBox.isOpen) return 0;
+
+    final now = TimeOfDay.now();
+    final currentTimeInMinutes = now.hour * 60 + now.minute;
+
+    return _feedingScheduleBox.values.where((schedule) {
+      try {
+        final scheduleTimeParts = schedule.time.split(':');
+        if (scheduleTimeParts.length != 2) return false;
+
+        final scheduleHour = int.tryParse(scheduleTimeParts[0]) ?? 0;
+        final scheduleMinute = int.tryParse(scheduleTimeParts[1]) ?? 0;
+        final scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+
+        // Consider schedules within the next 2 hours as "upcoming"
+        return scheduleTimeInMinutes > currentTimeInMinutes &&
+            scheduleTimeInMinutes <= currentTimeInMinutes + 120;
+      } catch (e) {
+        return false;
+      }
+    }).length;
   }
 
   @override
   void dispose() {
     _pigpenBox.listenable().removeListener(_loadTotalPigs);
-    _tasksBox.listenable().removeListener(_updateDashboard);
+    _tasksBox.listenable().removeListener(() {
+      setState(() {});
+    });
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[200],
       appBar: _buildAppBar(),
@@ -95,10 +128,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   AppBar _buildAppBar() {
     return AppBar(
-      centerTitle: true, // <-- add this line to center the title
+      centerTitle: true,
       title: Row(
-        mainAxisSize:
-            MainAxisSize.min, // <-- this helps center the Row contents
+        mainAxisSize: MainAxisSize.min,
         children: [
           ClipOval(
             child: Image.asset(
@@ -118,9 +150,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
       backgroundColor: Colors.green[700],
       elevation: 0,
       actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications),
-          onPressed: _showNotifications,
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications),
+              onPressed: _showNotifications,
+            ),
+            if (_feedingScheduleBox.isOpen)
+              ValueListenableBuilder(
+                valueListenable: _feedingScheduleBox.listenable(),
+                builder: (context, Box<FeedingSchedule> box, _) {
+                  final upcomingCount = _getUpcomingFeedingSchedulesCount();
+                  if (upcomingCount == 0) return const SizedBox();
+
+                  return Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.red,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        upcomingCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
         ),
       ],
     );
@@ -171,6 +239,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _buildFeedsStatus(isSmallScreen),
                         const SizedBox(height: 8),
                         _buildTasksStatus(isSmallScreen),
+                        const SizedBox(height: 8),
+                        _buildFeedingScheduleStatus(isSmallScreen),
                       ],
                     )
                   : Row(
@@ -178,6 +248,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       children: [
                         _buildFeedsStatus(isSmallScreen),
                         _buildTasksStatus(isSmallScreen),
+                        _buildFeedingScheduleStatus(isSmallScreen),
                       ],
                     ),
             ],
@@ -232,102 +303,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Navigation methods
-  Future<void> _navigateToPigpenManagement() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const PigpenManagementScreen()),
-    );
-    await _loadTotalPigs();
-  }
-
-  void _navigateToPigManagement() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => PigManagementScreen(
-          pigpenIndex: 0,
-          allPigs: widget.allPigs,
-          pig: Pig(
-            tag: '',
-            breed: '',
-            gender: '',
-            stage: '',
-            weight: 0,
-            source: '',
-            dob: '',
-            doe: '',
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _navigateToFeedManagement() async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const FeedManagementScreen()),
-    );
-    setState(() {});
-  }
-
-  void _navigateToTaskManagement() {
-    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
-    final allPigpens = _pigpenBox.values.toList();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TaskManagementScreen(
-          allPigs: allPigs,
-          allPigpens: allPigpens, // Add this line to pass the pigpens
-          initialSelectedPigs: [],
-        ),
-      ),
-    );
-  }
-
-  void _navigateToExpenseManagement() {
-    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ExpenseManagementScreen(allPigs: allPigs),
-      ),
-    );
-  }
-
-  void _navigateToSalesManagement() {
-    final pigpenBox = Hive.box<Pigpen>('pigpens');
-    final allPigs = pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
-    final allPigpens = pigpenBox.values.toList();
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SalesManagementScreen(
-          allPigs: allPigs,
-          allPigpens: allPigpens,
-        ),
-      ),
-    );
-  }
-
-  void _navigateToReports() {
-    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => ReportsScreen(allPigs: allPigs),
-      ),
-    );
-  }
-
-  void _showNotifications() {
-    // TODO: Implement notifications functionality
-  }
-
-  // Summary card widgets
   Widget _buildPigpenCount(bool isSmallScreen) {
     return Text(
       "Total Pigpens: ${_pigpenBox.length}",
@@ -359,14 +334,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            const Icon(Icons.kitchen, size: 16),
+            const SizedBox(width: 4),
             Text.rich(
               TextSpan(
                 children: [
-                  const TextSpan(text: "Feeds Level: "),
+                  const TextSpan(text: "Feeds: "),
                   TextSpan(
-                    text: lowStockCount > 0
-                        ? "$lowStockCount low stock"
-                        : "Stock good",
+                    text:
+                        lowStockCount > 0 ? "$lowStockCount low" : "Stock good",
                     style: TextStyle(
                       color: lowStockCount > 0 ? Colors.orange : Colors.green,
                     ),
@@ -391,11 +367,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
 
-        // Upcoming tasks (future dates)
-        final upcomingTasks = box.values
-            .where((task) => !task.isCompleted && task.date.isAfter(today))
-            .length;
-
         // Pending tasks (due today)
         final pendingTasks = box.values
             .where((task) =>
@@ -408,34 +379,60 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const SizedBox(width: 8),
+            const Icon(Icons.task, size: 16),
+            const SizedBox(width: 4),
             Text.rich(
               TextSpan(
                 children: [
                   const TextSpan(text: "Tasks: "),
-                  if (pendingTasks > 0)
-                    TextSpan(
-                      text: "$pendingTasks Pending",
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.orange, // Use orange for pending tasks
-                      ),
+                  TextSpan(
+                    text: pendingTasks > 0
+                        ? "$pendingTasks pending"
+                        : "All caught up",
+                    style: TextStyle(
+                      color: pendingTasks > 0 ? Colors.orange : Colors.green,
                     ),
-                  if (pendingTasks == 0 && upcomingTasks > 0)
-                    TextSpan(
-                      text: "$upcomingTasks Upcoming",
-                      style: TextStyle(
-                        fontSize: isSmallScreen ? 14 : 16,
-                        color: Colors.blue,
-                      ),
+                  ),
+                ],
+              ),
+              style: TextStyle(
+                fontSize: isSmallScreen ? 14 : 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFeedingScheduleStatus(bool isSmallScreen) {
+    if (!_feedingScheduleBox.isOpen) {
+      return const SizedBox();
+    }
+
+    return ValueListenableBuilder(
+      valueListenable: _feedingScheduleBox.listenable(),
+      builder: (context, Box<FeedingSchedule> box, _) {
+        final upcomingCount = _getUpcomingFeedingSchedulesCount();
+
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.alarm, size: 16),
+            const SizedBox(width: 4),
+            Text.rich(
+              TextSpan(
+                children: [
+                  const TextSpan(text: "Feeding Schedule: "),
+                  TextSpan(
+                    text:
+                        upcomingCount > 0 ? "$upcomingCount upcoming" : "None",
+                    style: TextStyle(
+                      color: upcomingCount > 0 ? Colors.orange : Colors.grey,
+                      fontWeight: FontWeight.bold,
                     ),
-                  if (pendingTasks == 0 && upcomingTasks == 0)
-                    const TextSpan(
-                      text: "All caught up",
-                      style: TextStyle(
-                        color: Colors.green,
-                      ),
-                    ),
+                  ),
                 ],
               ),
               style: TextStyle(
@@ -488,6 +485,150 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onTap: () {
               // TODO: Implement settings navigation
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _navigateToPigpenManagement() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const PigpenManagementScreen()),
+    );
+    await _loadTotalPigs();
+  }
+
+  void _navigateToPigManagement() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PigManagementScreen(
+          pigpenIndex: 0,
+          allPigs: widget.allPigs,
+          pig: Pig(
+            tag: '',
+            breed: '',
+            gender: '',
+            stage: '',
+            weight: 0,
+            source: '',
+            dob: '',
+            doe: '',
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _navigateToFeedManagement() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FeedManagementScreen()),
+    );
+    setState(() {});
+  }
+
+  void _navigateToTaskManagement() {
+    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = _pigpenBox.values.toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => TaskManagementScreen(
+          allPigs: allPigs,
+          allPigpens: allPigpens,
+          initialSelectedPigs: [],
+        ),
+      ),
+    );
+  }
+
+  void _navigateToExpenseManagement() {
+    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ExpenseManagementScreen(allPigs: allPigs),
+      ),
+    );
+  }
+
+  void _navigateToSalesManagement() {
+    final pigpenBox = Hive.box<Pigpen>('pigpens');
+    final allPigs = pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    final allPigpens = pigpenBox.values.toList();
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SalesManagementScreen(
+          allPigs: allPigs,
+          allPigpens: allPigpens,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToReports() {
+    final allPigs = _pigpenBox.values.expand((pigpen) => pigpen.pigs).toList();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ReportsScreen(allPigs: allPigs),
+      ),
+    );
+  }
+
+  void _showNotifications() {
+    if (!_feedingScheduleBox.isOpen) return;
+
+    final upcomingSchedules = _feedingScheduleBox.values.where((schedule) {
+      try {
+        final now = TimeOfDay.now();
+        final currentTimeInMinutes = now.hour * 60 + now.minute;
+        final scheduleTimeParts = schedule.time.split(':');
+        if (scheduleTimeParts.length != 2) return false;
+
+        final scheduleHour = int.tryParse(scheduleTimeParts[0]) ?? 0;
+        final scheduleMinute = int.tryParse(scheduleTimeParts[1]) ?? 0;
+        final scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
+
+        return scheduleTimeInMinutes > currentTimeInMinutes;
+      } catch (e) {
+        return false;
+      }
+    }).toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Upcoming Feeding Schedules"),
+        content: upcomingSchedules.isEmpty
+            ? const Text("No upcoming feeding schedules")
+            : SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: upcomingSchedules.length,
+                  itemBuilder: (context, index) {
+                    final schedule = upcomingSchedules[index];
+                    return ListTile(
+                      title: Text("${schedule.pigName} (${schedule.pigId})"),
+                      subtitle: Text(
+                        "Pen: ${schedule.pigpenId}\n"
+                        "Feed: ${schedule.feedType} (${schedule.quantity} kg)\n"
+                        "Time: ${schedule.time}",
+                      ),
+                    );
+                  },
+                ),
+              ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("OK"),
           ),
         ],
       ),

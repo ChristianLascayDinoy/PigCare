@@ -512,13 +512,19 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       await _loadTasks();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Task saved successfully')),
+          const SnackBar(
+            content: Text('Task saved successfully'),
+            backgroundColor: Colors.green, // Success color
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving task: $e')),
+          SnackBar(
+            content: Text('Error saving task: $e'),
+            backgroundColor: Colors.red, // Error color
+          ),
         );
       }
     }
@@ -862,6 +868,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
             const SnackBar(
               content: Text('Task successfully deleted'),
               duration: Duration(seconds: 2),
+              backgroundColor: Colors.red,
             ),
           );
           Navigator.pop(context, true);
@@ -872,6 +879,7 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
             SnackBar(
               content: Text('Error deleting task: $e'),
               duration: Duration(seconds: 2),
+              backgroundColor: Colors.red,
             ),
           );
           Navigator.pop(context, false);
