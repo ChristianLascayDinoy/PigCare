@@ -109,7 +109,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
             Provider.of<FeedExpenseProvider>(context, listen: false);
         await provider.deleteExpense(expense.id);
         await _loadExpenses();
-        _showSuccessSnackbar('Expense deleted successfully');
+        _showErrorSnackbar('Expense deleted successfully');
       } catch (e) {
         _showErrorSnackbar('Error deleting expense: $e');
       }
@@ -364,7 +364,7 @@ class _ExpenseManagementScreenState extends State<ExpenseManagementScreen> {
     return RefreshIndicator(
       onRefresh: _loadExpenses,
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 80),
         itemCount: _filteredExpenses.length,
         itemBuilder: (context, index) {
           final expense = _filteredExpenses[index];
@@ -1029,43 +1029,6 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
         ],
       ],
     );
-  }
-
-  Future<void> _confirmDeleteExpense() async {
-    if (widget.existingExpense == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: Text("Delete ${widget.existingExpense!.name} expense?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      try {
-        await widget.expensesBox.delete(widget.existingExpense!.id);
-        if (mounted) {
-          Navigator.pop(context);
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error deleting expense: $e')),
-          );
-        }
-      }
-    }
   }
 
   Future<void> _selectDate(BuildContext context) async {

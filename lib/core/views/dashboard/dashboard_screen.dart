@@ -334,7 +334,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.kitchen, size: 16),
             const SizedBox(width: 4),
             Text.rich(
               TextSpan(
@@ -367,7 +366,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final now = DateTime.now();
         final today = DateTime(now.year, now.month, now.day);
 
-        // Pending tasks (due today)
+        // Count pending tasks (due today)
         final pendingTasks = box.values
             .where((task) =>
                 !task.isCompleted &&
@@ -376,21 +375,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 task.date.day == today.day)
             .length;
 
+        // Count upcoming tasks (due in the future)
+        final upcomingTasks = box.values
+            .where((task) => !task.isCompleted && task.date.isAfter(today))
+            .length;
+
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.task, size: 16),
             const SizedBox(width: 4),
             Text.rich(
               TextSpan(
                 children: [
                   const TextSpan(text: "Tasks: "),
                   TextSpan(
-                    text: pendingTasks > 0
-                        ? "$pendingTasks pending"
+                    text: (pendingTasks > 0 || upcomingTasks > 0)
+                        ? "${pendingTasks} pending, ${upcomingTasks} upcoming"
                         : "All caught up",
                     style: TextStyle(
-                      color: pendingTasks > 0 ? Colors.orange : Colors.green,
+                      color: (pendingTasks > 0 || upcomingTasks > 0)
+                          ? Colors.orange
+                          : Colors.green,
                     ),
                   ),
                 ],
@@ -419,7 +424,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.alarm, size: 16),
             const SizedBox(width: 4),
             Text.rich(
               TextSpan(

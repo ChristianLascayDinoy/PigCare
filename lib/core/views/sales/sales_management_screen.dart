@@ -253,7 +253,7 @@ class _SalesManagementScreenState extends State<SalesManagementScreen> {
     return RefreshIndicator(
       onRefresh: _loadSales,
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 80),
         itemCount: _filteredSales.length,
         itemBuilder: (context, index) {
           final sale = _filteredSales[index];
@@ -733,6 +733,7 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
           child: Column(
             children: [
               // Pigpen selection - disabled when editing
+              // Pigpen selection - disabled when editing
               AbsorbPointer(
                 absorbing: isEditing,
                 child: DropdownButtonFormField<Pigpen>(
@@ -751,13 +752,14 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
                           ))
                       .toList(),
                   onChanged: _updatePigsList,
-                  validator: (value) =>
-                      value == null ? 'Please select a pig pen' : null,
+                  validator: isEditing
+                      ? null
+                      : (value) =>
+                          value == null ? 'Please select a pig pen' : null,
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Pig selection - disabled when editing
+// Pig selection - disabled when editing
               if (_selectedPigpen != null)
                 AbsorbPointer(
                   absorbing: isEditing,
@@ -777,8 +779,10 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
                       );
                     }).toList(),
                     onChanged: (pig) => setState(() => _selectedPig = pig),
-                    validator: (value) =>
-                        value == null ? 'Please select a pig' : null,
+                    validator: isEditing
+                        ? null
+                        : (value) =>
+                            value == null ? 'Please select a pig' : null,
                   ),
                 ),
               const SizedBox(height: 16),
@@ -793,6 +797,9 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
                 keyboardType: TextInputType.number,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
+                    if (isEditing && widget.existingSale?.weight != null) {
+                      return null; // Allow empty if editing and weight exists
+                    }
                     return 'Required field';
                   }
                   final weight = double.tryParse(value);
@@ -911,12 +918,14 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
 
   void _saveSale() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedPig == null) return;
+
+    // When editing, we don't need to validate pigpen and pig selection
+    if (widget.existingSale == null && _selectedPig == null) return;
 
     final sale = Sale(
       id: widget.existingSale?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
-      pigTag: _selectedPig!.tag,
+      pigTag: widget.existingSale?.pigTag ?? _selectedPig!.tag,
       buyerName: _buyerNameController.text,
       amount: double.parse(_amountController.text),
       date: _selectedDate,
@@ -930,31 +939,5 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
     );
 
     Navigator.pop(context, sale);
-  }
-
-  Future<void> _confirmDeleteSale() async {
-    if (widget.existingSale == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text("Confirm Delete"),
-        content: Text("Delete sale of ${widget.existingSale!.pigTag}?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text("Cancel"),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text("Delete", style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      Navigator.pop(context, true);
-    }
   }
 }

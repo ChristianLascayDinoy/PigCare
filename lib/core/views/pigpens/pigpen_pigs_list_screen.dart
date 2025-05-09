@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:pigcare/core/models/pig_model.dart';
 import 'package:pigcare/core/models/pigpen_model.dart';
+import 'package:pigcare/core/views/pigs/pig_details_screen.dart';
 
 class PigpenPigsListScreen extends StatefulWidget {
   final Pigpen pigpen;
@@ -18,31 +19,38 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ClipOval(
-              child: Image.asset(
-                'lib/assets/images/pig.png',
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text('Pigs in ${widget.pigpen.name} Pigpen'),
-            const SizedBox(width: 8),
-            ClipOval(
-              child: Image.asset(
-                'lib/assets/images/pigpen.png',
-                height: 40,
-                width: 40,
-                fit: BoxFit.cover,
-              ),
-            ),
-          ],
-        ),
         centerTitle: true,
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ClipOval(
+                child: Image.asset(
+                  'lib/assets/images/pig.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Pigs in ${widget.pigpen.name} Pigpen',
+                style: const TextStyle(fontSize: 18),
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(width: 8),
+              ClipOval(
+                child: Image.asset(
+                  'lib/assets/images/pigpen.png',
+                  height: 40,
+                  width: 40,
+                  fit: BoxFit.cover,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
       body: ValueListenableBuilder<Box<Pigpen>>(
         valueListenable: Hive.box<Pigpen>('pigpens').listenable(),
@@ -85,6 +93,7 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: InkWell(
+        onTap: () => _navigateToPigDetails(pig), // Add this line
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(
@@ -121,6 +130,30 @@ class _PigpenPigsListScreenState extends State<PigpenPigsListScreen> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  void _navigateToPigDetails(Pig pig) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => PigDetailsScreen(
+          pig: pig,
+          pigpens: Hive.box<Pigpen>('pigpens').values.toList(),
+          onPigUpdated: (updatedPig) {
+            // Handle pig update if needed
+            setState(() {});
+          },
+          onPigDeleted: (pigToDelete) {
+            // Handle pig deletion if needed
+            setState(() {});
+          },
+          allPigs: Hive.box<Pigpen>('pigpens')
+              .values
+              .expand((pigpen) => pigpen.pigs)
+              .toList(),
         ),
       ),
     );

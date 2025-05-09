@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:hive/hive.dart';
+import 'package:pigcare/core/models/feeding_schedule_model.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:flutter_timezone/flutter_timezone.dart';
@@ -33,7 +35,7 @@ class NotificationService {
     await _notificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap
+        handleNotificationResponse(response.payload); // Handle notification tap
       },
     );
   }
@@ -44,6 +46,7 @@ class NotificationService {
     required String body,
     required TimeOfDay time,
     required DateTime date,
+    String? payload, // Add this parameter
   }) async {
     final now = DateTime.now();
     final scheduledDate = DateTime(
@@ -80,6 +83,7 @@ class NotificationService {
       ),
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: DateTimeComponents.time,
+      payload: payload, // Pass the payload here
     );
   }
 
@@ -89,5 +93,20 @@ class NotificationService {
 
   Future<void> cancelAllNotifications() async {
     await _notificationsPlugin.cancelAll();
+  }
+
+  Future<void> handleNotificationResponse(String? payload) async {
+    if (payload == null) return;
+
+    try {
+      final box = await Hive.openBox<FeedingSchedule>('feedingSchedules');
+      final schedule = box.get(payload);
+
+      if (schedule != null && !schedule.isFeedDeducted) {
+        await schedule.executeFeeding();
+      }
+    } catch (e) {
+      debugPrint('Error handling feeding notification: $e');
+    }
   }
 }

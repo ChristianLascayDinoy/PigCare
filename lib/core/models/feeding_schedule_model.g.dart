@@ -26,13 +26,14 @@ class FeedingScheduleAdapter extends TypeAdapter<FeedingSchedule> {
       time: fields[6] as String,
       date: fields[7] as DateTime,
       notificationId: fields[8] as int,
+      isFeedDeducted: fields[9] as bool,
     );
   }
 
   @override
   void write(BinaryWriter writer, FeedingSchedule obj) {
     writer
-      ..writeByte(9)
+      ..writeByte(10)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -50,7 +51,9 @@ class FeedingScheduleAdapter extends TypeAdapter<FeedingSchedule> {
       ..writeByte(7)
       ..write(obj.date)
       ..writeByte(8)
-      ..write(obj.notificationId);
+      ..write(obj.notificationId)
+      ..writeByte(9)
+      ..write(obj.isFeedDeducted);
   }
 
   @override

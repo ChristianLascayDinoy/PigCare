@@ -26,12 +26,23 @@ class PigManagementScreen extends StatefulWidget {
   State<PigManagementScreen> createState() => _PigManagementScreenState();
 }
 
+enum PigSortOption {
+  dateAdded, // Default - by date of entry (doe)
+  tagNumber,
+  name,
+  weight,
+  age,
+  pigpen,
+}
+
 class _PigManagementScreenState extends State<PigManagementScreen> {
   late Box<Pigpen> _pigpenBox;
   List<Pig> _allPigs = [];
   List<Pigpen> _allPigpens = [];
   final ImagePicker _imagePicker = ImagePicker();
   String _searchQuery = '';
+  PigSortOption _currentSortOption = PigSortOption.dateAdded;
+  bool _sortAscending = true;
 
   @override
   void initState() {
@@ -75,13 +86,117 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
   }
 
   List<Pig> get _filteredPigs {
-    if (_searchQuery.isEmpty) return _allPigs;
-    return _allPigs.where((pig) {
+    List<Pig> pigs = _allPigs.where((pig) {
+      if (_searchQuery.isEmpty) return true;
       return pig.tag.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           (pig.name?.toLowerCase().contains(_searchQuery.toLowerCase()) ??
               false) ||
           pig.breed.toLowerCase().contains(_searchQuery.toLowerCase());
     }).toList();
+
+    // Apply sorting
+    pigs = _sortPigs(pigs);
+
+    return pigs;
+  }
+
+  List<Pig> _sortPigs(List<Pig> pigs) {
+    switch (_currentSortOption) {
+      case PigSortOption.dateAdded:
+        pigs.sort((a, b) =>
+            _sortAscending ? a.doe.compareTo(b.doe) : b.doe.compareTo(a.doe));
+        break;
+      case PigSortOption.tagNumber:
+        pigs.sort((a, b) =>
+            _sortAscending ? a.tag.compareTo(b.tag) : b.tag.compareTo(a.tag));
+        break;
+      case PigSortOption.name:
+        pigs.sort((a, b) {
+          final aName = a.name ?? '';
+          final bName = b.name ?? '';
+          return _sortAscending
+              ? aName.compareTo(bName)
+              : bName.compareTo(aName);
+        });
+        break;
+      case PigSortOption.weight:
+        pigs.sort((a, b) => _sortAscending
+            ? a.weight.compareTo(b.weight)
+            : b.weight.compareTo(a.weight));
+        break;
+      case PigSortOption.age:
+        pigs.sort((a, b) =>
+            _sortAscending ? a.dob.compareTo(b.dob) : b.dob.compareTo(a.dob));
+        break;
+      case PigSortOption.pigpen:
+        pigs.sort((a, b) {
+          final aPen = a.getPigpenName(_allPigpens) ?? '';
+          final bPen = b.getPigpenName(_allPigpens) ?? '';
+          return _sortAscending ? aPen.compareTo(bPen) : bPen.compareTo(aPen);
+        });
+        break;
+    }
+    return pigs;
+  }
+
+  Future<void> _showSortOptions() async {
+    await showModalBottomSheet(
+      context: context,
+      builder: (context) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Text(
+                'Sort Pigs By',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+            ...PigSortOption.values.map((option) {
+              return RadioListTile<PigSortOption>(
+                title: Text(_getSortOptionName(option)),
+                value: option,
+                groupValue: _currentSortOption,
+                onChanged: (PigSortOption? value) {
+                  if (value != null) {
+                    setState(() {
+                      // If selecting the same option, toggle direction
+                      if (_currentSortOption == value) {
+                        _sortAscending = !_sortAscending;
+                      } else {
+                        // Default to ascending when changing sort option
+                        _currentSortOption = value;
+                        _sortAscending = true;
+                      }
+                    });
+                    Navigator.pop(context);
+                  }
+                },
+              );
+            }).toList(),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
+  String _getSortOptionName(PigSortOption option) {
+    switch (option) {
+      case PigSortOption.dateAdded:
+        return 'Date Added ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+      case PigSortOption.tagNumber:
+        return 'Tag Number ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+      case PigSortOption.name:
+        return 'Name ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+      case PigSortOption.weight:
+        return 'Weight ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+      case PigSortOption.age:
+        return 'Age ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+      case PigSortOption.pigpen:
+        return 'Pigpen ${_sortAscending && _currentSortOption == option ? '↑' : (!_sortAscending && _currentSortOption == option ? '↓' : '')}';
+    }
   }
 
   Future<void> _showAddPigDialog() async {
@@ -233,8 +348,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Row(
-          mainAxisSize:
-              MainAxisSize.min, // <-- this helps center the Row contents
+          mainAxisSize: MainAxisSize.min,
           children: [
             ClipOval(
               child: Image.asset(
@@ -253,6 +367,13 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
         ),
         centerTitle: true,
         backgroundColor: Colors.green[700],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.sort),
+            onPressed: _showSortOptions,
+            tooltip: 'Sort pigs',
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddPigDialog,
@@ -297,6 +418,7 @@ class _PigManagementScreenState extends State<PigManagementScreen> {
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.only(bottom: 80),
       itemCount: _filteredPigs.length,
       itemBuilder: (context, index) {
         final pig = _filteredPigs[index];

@@ -86,17 +86,8 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
 
     final double quantity = double.tryParse(quantityController.text) ?? 0;
     final List<Pig> pigsToFeed = assignToAll ? pigsInSelectedPen : selectedPigs;
-    final double totalRequired = pigsToFeed.length * quantity;
-
-    if (selectedFeed!.remainingQuantity < totalRequired) {
-      _showError("Not enough ${selectedFeed!.name} available! "
-          "Available: ${selectedFeed!.remainingQuantity} kg, "
-          "Required: $totalRequired kg");
-      return;
-    }
 
     try {
-      // Create all schedules first
       final schedules = <FeedingSchedule>[];
 
       for (final pig in pigsToFeed) {
@@ -117,13 +108,9 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
 
       // Save all schedules to Hive
       for (final schedule in schedules) {
-        await feedingScheduleBox.put(schedule.id, schedule); // Save using ID
+        await feedingScheduleBox.put(schedule.id, schedule);
         await schedule.scheduleNotification();
       }
-
-      // Update feed quantity
-      selectedFeed!.deductFeed(totalRequired);
-      await feedBox.put(selectedFeed!.id, selectedFeed!); // Save using ID
 
       _resetForm();
       _showSuccess('Schedule saved for ${pigsToFeed.length} pigs!');

@@ -309,7 +309,7 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Feed and expense deleted successfully'),
+              content: Text('Feed deleted successfully'),
               backgroundColor: Colors.red,
             ),
           );
@@ -570,68 +570,77 @@ class _FeedManagementScreenState extends State<FeedManagementScreen> {
                       );
                     }
 
-                    return SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: DataTable(
-                        columnSpacing: 24,
-                        columns: const [
-                          DataColumn(label: Text("Name")),
-                          DataColumn(label: Text("Brand")),
-                          DataColumn(label: Text("Supplier")),
-                          DataColumn(
-                              label: Text("Quantity (kg)"), numeric: true),
-                          DataColumn(label: Text("Price (₱)"), numeric: true),
-                          DataColumn(label: Text("Purchase Date")),
-                          DataColumn(label: Text("Actions")),
-                        ],
-                        rows: List.generate(box.length, (index) {
-                          final feed = box.getAt(index)!;
-                          final isLowStock = feed.quantity < lowStockThreshold;
-
-                          return DataRow(
-                            color: MaterialStateProperty.resolveWith<Color?>(
-                              (states) => isLowStock
-                                  ? Colors.red[50]?.withOpacity(0.3)
-                                  : null,
-                            ),
-                            cells: [
-                              DataCell(
-                                Text(
-                                  feed.name,
-                                  style: TextStyle(
-                                    fontWeight: isLowStock
-                                        ? FontWeight.bold
-                                        : FontWeight.normal,
-                                  ),
-                                ),
-                              ),
-                              DataCell(Text(feed.brand)),
-                              DataCell(Text(feed.supplier)),
-                              DataCell(Text(feed.quantity.toStringAsFixed(2))),
-                              DataCell(
-                                  Text("₱${feed.price.toStringAsFixed(2)}")),
-                              DataCell(Text(DateFormat('MMM dd, yyyy')
-                                  .format(feed.purchaseDate))),
-                              DataCell(
-                                Row(
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      color: Colors.blue,
-                                      onPressed: () =>
-                                          _showFeedDialog(feed: feed),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.delete),
-                                      color: Colors.red,
-                                      onPressed: () => _deleteFeed(feed),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                    return Scrollbar(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.vertical,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: DataTable(
+                            columnSpacing: 24,
+                            columns: const [
+                              DataColumn(label: Text("Name")),
+                              DataColumn(label: Text("Brand")),
+                              DataColumn(label: Text("Supplier")),
+                              DataColumn(
+                                  label: Text("Quantity (kg)"), numeric: true),
+                              DataColumn(
+                                  label: Text("Price (₱)"), numeric: true),
+                              DataColumn(label: Text("Purchase Date")),
+                              DataColumn(label: Text("Actions")),
                             ],
-                          );
-                        }),
+                            rows: List.generate(box.length, (index) {
+                              final feed = box.getAt(index)!;
+                              final isLowStock =
+                                  feed.quantity < lowStockThreshold;
+
+                              return DataRow(
+                                color:
+                                    MaterialStateProperty.resolveWith<Color?>(
+                                  (states) => isLowStock
+                                      ? Colors.red[50]?.withOpacity(0.3)
+                                      : null,
+                                ),
+                                cells: [
+                                  DataCell(
+                                    Text(
+                                      feed.name,
+                                      style: TextStyle(
+                                        fontWeight: isLowStock
+                                            ? FontWeight.bold
+                                            : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                  DataCell(Text(feed.brand)),
+                                  DataCell(Text(feed.supplier)),
+                                  DataCell(
+                                      Text(feed.quantity.toStringAsFixed(2))),
+                                  DataCell(Text(
+                                      "₱${feed.price.toStringAsFixed(2)}")),
+                                  DataCell(Text(DateFormat('MMM dd, yyyy')
+                                      .format(feed.purchaseDate))),
+                                  DataCell(
+                                    Row(
+                                      children: [
+                                        IconButton(
+                                          icon: const Icon(Icons.edit),
+                                          color: Colors.blue,
+                                          onPressed: () =>
+                                              _showFeedDialog(feed: feed),
+                                        ),
+                                        IconButton(
+                                          icon: const Icon(Icons.delete),
+                                          color: Colors.red,
+                                          onPressed: () => _deleteFeed(feed),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
                       ),
                     );
                   },

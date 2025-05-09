@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hive/hive.dart';
+import 'package:pigcare/core/models/feed_model.dart';
 import 'package:pigcare/core/services/notification_service.dart';
 import 'package:uuid/uuid.dart';
 
@@ -8,7 +9,7 @@ part 'feeding_schedule_model.g.dart';
 @HiveType(typeId: 3)
 class FeedingSchedule {
   @HiveField(0)
-  final String id; // New unique ID field
+  final String id;
 
   @HiveField(1)
   final String pigId;
@@ -34,6 +35,9 @@ class FeedingSchedule {
   @HiveField(8)
   final int notificationId;
 
+  @HiveField(9)
+  bool isFeedDeducted; // Track if feed has been deducted
+
   FeedingSchedule({
     String? id,
     required this.pigId,
@@ -44,6 +48,7 @@ class FeedingSchedule {
     required this.time,
     required this.date,
     required this.notificationId,
+    this.isFeedDeducted = false,
   }) : id = id ?? const Uuid().v4();
 
   TimeOfDay get timeOfDay {
@@ -69,6 +74,30 @@ class FeedingSchedule {
     }
   }
 
+  Future<void> executeFeeding() async {
+    if (isFeedDeducted) return; // Skip if already deducted
+
+    final feedBox = await Hive.openBox<Feed>('feedsBox');
+    final feeds = feedBox.values.where((f) => f.name == feedType).toList();
+
+    if (feeds.isEmpty) {
+      throw Exception('Feed type $feedType not found');
+    }
+
+    final feed = feeds.first;
+    if (feed.remainingQuantity < quantity) {
+      throw Exception('Not enough $feedType available');
+    }
+
+    feed.deductFeed(quantity);
+    await feedBox.put(feed.id, feed);
+
+    // Mark as deducted
+    isFeedDeducted = true;
+    final scheduleBox = await Hive.openBox<FeedingSchedule>('feedingSchedules');
+    await scheduleBox.put(id, this);
+  }
+
   Future<void> scheduleNotification() async {
     final notificationService = NotificationService();
     await notificationService.initialize();
@@ -79,6 +108,7 @@ class FeedingSchedule {
       body: 'Feed $quantity kg of $feedType in $pigpenId',
       time: timeOfDay,
       date: date,
+      payload: id, // Pass schedule ID to handle when notification is received
     );
   }
 

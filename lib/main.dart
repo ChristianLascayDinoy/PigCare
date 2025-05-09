@@ -35,6 +35,7 @@ void main() async {
     final notificationService = NotificationService();
     await notificationService.initialize();
     await _rescheduleAllNotifications();
+    await checkPendingFeedings();
 
     // Now run the actual app with the provider
     runApp(
@@ -280,6 +281,31 @@ Future<void> _rescheduleAllNotifications() async {
   } catch (e) {
     debugPrint('Error rescheduling notifications: ${e.toString()}');
   }
+}
+
+Future<void> checkPendingFeedings() async {
+  try {
+    final now = DateTime.now();
+    final currentTime = TimeOfDay.fromDateTime(now);
+    final box = await Hive.openBox<FeedingSchedule>('feedingSchedules');
+
+    for (final schedule in box.values) {
+      if (!schedule.isFeedDeducted &&
+          schedule.date.isBefore(now) &&
+          isTimePassed(schedule.timeOfDay, currentTime)) {
+        await schedule.executeFeeding();
+      }
+    }
+  } catch (e) {
+    debugPrint('Error checking pending feedings: $e');
+  }
+}
+
+bool isTimePassed(TimeOfDay scheduledTime, TimeOfDay currentTime) {
+  if (scheduledTime.hour < currentTime.hour) return true;
+  if (scheduledTime.hour == currentTime.hour &&
+      scheduledTime.minute <= currentTime.minute) return true;
+  return false;
 }
 
 class PigCareApp extends StatelessWidget {

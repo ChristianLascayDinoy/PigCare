@@ -223,7 +223,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     return RefreshIndicator(
       onRefresh: _loadTasks,
       child: ListView.builder(
-        padding: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.only(bottom: 80),
         itemCount: _filteredTasks.length,
         itemBuilder: (context, index) {
           final task = _filteredTasks[index];

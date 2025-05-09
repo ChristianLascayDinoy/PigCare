@@ -362,6 +362,7 @@ class _PigpenManagementScreenState extends State<PigpenManagementScreen> {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: GridView.builder(
+                    padding: const EdgeInsets.only(bottom: 80),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
