@@ -3,7 +3,7 @@ import 'package:hive/hive.dart';
 import 'package:intl/intl.dart';
 import '../../models/pig_model.dart';
 import '../../models/pigpen_model.dart';
-import '../../models/task_model.dart'; // This should be updated to task_model.dart
+import '../../models/task_model.dart';
 import 'dart:io';
 
 class PigDetailsScreen extends StatefulWidget {
@@ -30,10 +30,10 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late Pig _currentPig;
-  late Box<PigTask> _tasksBox; // Changed from PigEvent to PigTask
-  List<PigTask> _upcomingTasks = []; // Changed from Events to Tasks
-  List<PigTask> _pastTasks = []; // Changed from Events to Tasks
-  bool _isLoadingTasks = false; // Changed from Events to Tasks
+  late Box<PigTask> _tasksBox;
+  List<PigTask> _upcomingTasks = [];
+  List<PigTask> _pastTasks = [];
+  bool _isLoadingTasks = false;
 
   List<Pig> _getOffspring() {
     return widget.allPigs
@@ -307,7 +307,9 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   }
 
   Widget _buildTaskCard(PigTask task) {
-    // Changed from Event to Task
+    final isUpcoming = !task.isCompleted && task.date.isAfter(DateTime.now());
+    final isPending = !task.isCompleted && !task.date.isAfter(DateTime.now());
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
@@ -316,7 +318,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
-        onTap: () => _showTaskDetails(task), // Changed from event
+        onTap: () => _showTaskDetails(task),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -331,17 +333,16 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: task.isUpcoming
-                            ? Colors.green[700]
-                            : Colors.grey[700],
+                        color:
+                            task.isCompleted ? Colors.grey[600] : Colors.black,
                       ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   Chip(
-                    label: Text(task.taskType), // Changed from eventType
-                    backgroundColor:
-                        _getTaskTypeColor(task.taskType), // Changed from event
+                    label: Text(task.taskType,
+                        style: TextStyle(color: Colors.white)),
+                    backgroundColor: _getTaskTypeColor(task.taskType),
                   ),
                 ],
               ),
@@ -349,32 +350,61 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
               Row(
                 children: [
                   Icon(
-                    Icons.calendar_today,
+                    task.isCompleted
+                        ? Icons.check_circle
+                        : isPending
+                            ? Icons.warning
+                            : Icons.calendar_today,
                     size: 16,
-                    color: Colors.grey[600],
+                    color: task.isCompleted
+                        ? Colors.green
+                        : isPending
+                            ? Colors.orange
+                            : Colors.blue,
                   ),
                   const SizedBox(width: 4),
                   Text(
                     DateFormat('MMM dd, yyyy').format(task.date),
                     style: TextStyle(
-                      color: task.isUpcoming ? Colors.green[700] : Colors.grey,
+                      color: task.isCompleted
+                          ? Colors.grey
+                          : isPending
+                              ? Colors.orange
+                              : Colors.blue,
                     ),
                   ),
-                  if (task.isUpcoming) ...[
+                  if (task.isCompleted) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '• Completed',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ] else if (isPending) ...[
+                    const Spacer(),
+                    Chip(
+                      label: const Text("Pending"),
+                      backgroundColor: Colors.orange[50],
+                      labelStyle: const TextStyle(color: Colors.orange),
+                    ),
+                  ] else ...[
                     const Spacer(),
                     Chip(
                       label: const Text("Upcoming"),
-                      backgroundColor: Colors.green[50],
-                      labelStyle: const TextStyle(color: Colors.green),
+                      backgroundColor: Colors.blue[50],
+                      labelStyle: const TextStyle(color: Colors.blue),
                     ),
                   ],
                 ],
               ),
               const SizedBox(height: 12),
-              Text(
-                task.description,
-                style: const TextStyle(fontSize: 14),
-              ),
+              if (task.description.isNotEmpty)
+                Text(
+                  task.description,
+                  style: const TextStyle(fontSize: 14),
+                ),
             ],
           ),
         ),
@@ -586,8 +616,7 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
   }
 
   Future<void> _showTaskDetails(PigTask task) async {
-    // Changed from Event to Task
-    final result = await showDialog<PigTask>(
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(task.name),
@@ -596,21 +625,48 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                DateFormat.yMMMMd().add_jm().format(task.date),
-                style: const TextStyle(fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Chip(
-                label: Text(task.taskType), // Changed from eventType
-                backgroundColor:
-                    _getTaskTypeColor(task.taskType), // Changed from event
+              Row(
+                children: [
+                  Icon(
+                    task.isCompleted
+                        ? Icons.check_circle
+                        : Icons.calendar_today,
+                    size: 20,
+                    color: task.isCompleted ? Colors.green : Colors.grey[600],
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    task.isCompleted ? 'Completed Task' : 'Upcoming Task',
+                    style: TextStyle(
+                      color: task.isCompleted ? Colors.green : Colors.grey[800],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              Text(
-                task.description,
-                style: const TextStyle(fontSize: 16),
+              _buildTaskDetailItem(
+                Icons.calendar_today,
+                'Scheduled: ${DateFormat('MMM dd, yyyy').format(task.date)}',
               ),
+              if (task.isCompleted && task.completedDate != null)
+                _buildTaskDetailItem(
+                  Icons.check_circle,
+                  'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
+                ),
+              const SizedBox(height: 8),
+              Chip(
+                label:
+                    Text(task.taskType, style: TextStyle(color: Colors.white)),
+                backgroundColor: _getTaskTypeColor(task.taskType),
+              ),
+              const SizedBox(height: 16),
+              if (task.description.isNotEmpty) ...[
+                const Text('Description:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Text(task.description),
+                const SizedBox(height: 16),
+              ],
             ],
           ),
         ),
@@ -622,10 +678,19 @@ class _PigDetailsScreenState extends State<PigDetailsScreen>
         ],
       ),
     );
+  }
 
-    if (result != null && mounted) {
-      await _loadPigTasks(); // Changed from events
-    }
+  Widget _buildTaskDetailItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Text(text),
+        ],
+      ),
+    );
   }
 
   // ==================== Pig Methods ====================

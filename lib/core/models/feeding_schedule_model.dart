@@ -74,6 +74,7 @@ class FeedingSchedule {
     }
   }
 
+// In feeding_schedule_model.dart
   Future<void> executeFeeding() async {
     if (isFeedDeducted) return; // Skip if already deducted
 
@@ -89,11 +90,14 @@ class FeedingSchedule {
       throw Exception('Not enough $feedType available');
     }
 
+    // Deduct the feed
     feed.deductFeed(quantity);
     await feedBox.put(feed.id, feed);
 
     // Mark as deducted
     isFeedDeducted = true;
+
+    // Update the schedule in Hive
     final scheduleBox = await Hive.openBox<FeedingSchedule>('feedingSchedules');
     await scheduleBox.put(id, this);
   }
@@ -134,6 +138,7 @@ class FeedingSchedule {
       notificationId: pigId.hashCode ^
           feedType.hashCode ^
           (DateTime.now().millisecondsSinceEpoch ~/ 1000),
+      isFeedDeducted: false, // Explicitly set to false
     );
   }
 }

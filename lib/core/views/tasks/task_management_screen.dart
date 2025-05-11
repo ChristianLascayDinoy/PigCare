@@ -73,7 +73,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   Future<void> _deleteTask(PigTask task) async {
     try {
       await _tasksBox.delete(task.id);
-      await _loadTasks();
+      await _loadTasks(); // This will refresh the list
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -111,6 +111,135 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         }
         return b.date.compareTo(a.date);
       });
+  }
+
+  Future<void> _showTaskDetails(BuildContext context, PigTask task) async {
+    await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(task.name),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (task.isCompleted) ...[
+                Row(
+                  children: [
+                    Icon(Icons.check_circle, color: Colors.green, size: 20),
+                    SizedBox(width: 8),
+                    Text('Completed Task',
+                        style: TextStyle(color: Colors.green)),
+                  ],
+                ),
+                SizedBox(height: 16),
+              ],
+              _buildTaskDetailItem(
+                Icons.calendar_today,
+                'Scheduled: ${DateFormat('MMM dd, yyyy').format(task.date)}',
+              ),
+              if (task.isCompleted && task.completedDate != null) ...[
+                _buildTaskDetailItem(
+                  Icons.check_circle,
+                  'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
+                ),
+              ],
+              SizedBox(height: 8),
+              Chip(
+                label:
+                    Text(task.taskType, style: TextStyle(color: Colors.white)),
+                backgroundColor: _getTaskTypeColor(task.taskType),
+              ),
+              SizedBox(height: 16),
+              if (task.description?.isNotEmpty ?? false) ...[
+                Text('Description:',
+                    style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                Text(task.description!),
+                SizedBox(height: 16),
+              ],
+              Text('Assigned Pigs (${task.pigTags.length}):',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              if (task.pigTags.isEmpty)
+                Text('No pigs assigned', style: TextStyle(color: Colors.grey))
+              else
+                ...task.pigTags.map((tag) => Text('- $tag')).toList(),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text("Close"),
+          ),
+          if (!task.isCompleted) ...[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _markTaskAsComplete(task);
+              },
+              child: Text("Mark Complete"),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTaskDetailItem(IconData icon, String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: Colors.grey[600]),
+          SizedBox(width: 8),
+          Flexible(child: Text(text)),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showEditTaskDialog(BuildContext context, PigTask task) async {
+    final result = await Navigator.of(context).push<PigTask>(
+      MaterialPageRoute(
+        builder: (context) => AddEditTaskDialog(
+          allPigs: widget.allPigs,
+          allPigpens: widget.allPigpens,
+          existingTask: task,
+          initialSelectedPigs: task.pigTags,
+          tasksBox: _tasksBox,
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      await _saveTask(result);
+    }
+  }
+
+  Future<void> _confirmDeleteTask(PigTask task) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Confirm Delete"),
+        content: Text("Delete ${task.name} task?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text("Cancel"),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      await _deleteTask(task);
+    }
   }
 
   @override
@@ -234,126 +363,190 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
   }
 
   Widget _buildTaskCard(PigTask task) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final taskDate = DateTime(task.date.year, task.date.month, task.date.day);
+
+    // Corrected logic for pending/upcoming
+    final isPending = !task.isCompleted && taskDate.isAtSameMomentAs(today);
+    final isUpcoming = !task.isCompleted && taskDate.isAfter(today);
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(8),
-        onTap: () => _showTaskDetails(context, task),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: Text(
-                      task.name,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: task.isCompleted ? Colors.green[700] : null,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  Chip(
-                    label: Text(task.taskType),
-                    backgroundColor: _getTaskTypeColor(task.taskType),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    task.isCompleted
-                        ? Icons.check_circle
-                        : Icons.calendar_today,
-                    size: 16,
-                    color: task.isCompleted ? Colors.green : Colors.grey[600],
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormat('MMM dd, yyyy').format(task.date),
-                    style: TextStyle(
-                      color: task.isCompleted
-                          ? Colors.green[700]
-                          : task.date.isAfter(DateTime.now())
-                              ? Colors.green[700]
-                              : Colors.grey,
-                    ),
-                  ),
-                  if (task.isCompleted) ...[
-                    const SizedBox(width: 8),
-                    Text(
-                      '• Completed',
-                      style: TextStyle(
-                        color: Colors.green[700],
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ] else if (task.date.isAfter(DateTime.now())) ...[
-                    const Spacer(),
-                    Chip(
-                      label: const Text("Upcoming"),
-                      backgroundColor: Colors.green[50],
-                      labelStyle: const TextStyle(color: Colors.green),
-                    ),
-                  ],
-                ],
-              ),
-              if (task.isCompleted && task.completedDate != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[600],
-                  ),
-                ),
-              ],
-              if (task.description != null && task.description!.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  task.description!,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-              const SizedBox(height: 8),
-              Text(
-                "Pigs: ${task.pigTags.length}",
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (!task.isCompleted) ...[
-                    TextButton(
-                      onPressed: () => _markTaskAsComplete(task),
-                      child: const Text("Mark Complete"),
-                    ),
-                    const SizedBox(width: 8),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 20),
-                      onPressed: () => _showTaskDetails(context, task),
-                      tooltip: 'Edit task',
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
         ),
-      ),
-    );
+        child: InkWell(
+          borderRadius: BorderRadius.circular(8),
+          onTap: () => _showTaskDetails(context, task),
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        task.name,
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          color: task.isCompleted
+                              ? Colors.green[700]
+                              : isPending
+                                  ? Colors.orange[700]
+                                  : null,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Chip(
+                      label: Text(task.taskType),
+                      backgroundColor: _getTaskTypeColor(task.taskType),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Icon(
+                      task.isCompleted
+                          ? Icons.check_circle
+                          : isPending
+                              ? Icons.pending_actions
+                              : Icons.calendar_today,
+                      size: 16,
+                      color: task.isCompleted
+                          ? Colors.green
+                          : isPending
+                              ? Colors.orange
+                              : Colors.grey[600],
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      DateFormat('MMM dd, yyyy').format(task.date),
+                      style: TextStyle(
+                        color: task.isCompleted
+                            ? Colors.green[700]
+                            : isUpcoming
+                                ? Colors.green[700]
+                                : isPending
+                                    ? Colors.orange[700]
+                                    : Colors.grey,
+                      ),
+                    ),
+                    if (task.isCompleted) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '• Completed',
+                        style: TextStyle(
+                          color: Colors.green[700],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ] else if (isUpcoming) ...[
+                      const Spacer(),
+                      Chip(
+                        label: const Text("Upcoming"),
+                        backgroundColor: Colors.green[50],
+                        labelStyle: const TextStyle(color: Colors.blue),
+                      ),
+                    ] else if (isPending) ...[
+                      const Spacer(),
+                      Chip(
+                        label: const Text("Pending"),
+                        backgroundColor: Colors.orange[50],
+                        labelStyle: const TextStyle(color: Colors.orange),
+                      ),
+                    ],
+                  ],
+                ),
+                if (task.isCompleted && task.completedDate != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+                if (task.description != null &&
+                    task.description!.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    task.description!,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  "Pigs: ${task.pigTags.length}",
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    if (!task.isCompleted)
+                      TextButton(
+                        onPressed: () => _markTaskAsComplete(task),
+                        child: const Text("Mark Complete"),
+                      ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert),
+                      itemBuilder: (BuildContext context) => [
+                        const PopupMenuItem<String>(
+                          value: 'view',
+                          child: ListTile(
+                            leading: Icon(Icons.visibility),
+                            title: Text('View Details'),
+                            iconColor: Colors.blue,
+                          ),
+                        ),
+                        if (!task.isCompleted) ...[
+                          const PopupMenuItem<String>(
+                            value: 'edit',
+                            child: ListTile(
+                              leading: Icon(Icons.edit),
+                              title: Text('Edit'),
+                              iconColor: Colors.blue,
+                            ),
+                          ),
+                          const PopupMenuItem<String>(
+                            value: 'delete',
+                            child: ListTile(
+                              leading: Icon(Icons.delete, color: Colors.red),
+                              title: Text('Delete',
+                                  style: TextStyle(color: Colors.red)),
+                            ),
+                          ),
+                        ],
+                      ],
+                      onSelected: (String value) async {
+                        switch (value) {
+                          case 'view':
+                            await _showTaskDetails(context, task);
+                            break;
+                          case 'edit':
+                            await _showEditTaskDialog(context, task);
+                            break;
+                          case 'delete':
+                            await _confirmDeleteTask(task);
+                            break;
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ));
   }
 
   Future<void> _markTaskAsComplete(PigTask task) async {
@@ -380,7 +573,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
       try {
         final completedTask = task.copyWith(
           isCompleted: true,
-          completedDate: DateTime.now(),
+          completedDate: DateTime.now(), // Use current date/time for completion
         );
         await _tasksBox.put(task.id, completedTask);
         await _loadTasks();
@@ -418,103 +611,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
     }
   }
 
-  Future<void> _showTaskDetails(BuildContext context, PigTask task) async {
-    if (task.isCompleted) {
-      // Read-only view for completed tasks with delete option
-      final shouldDelete = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(task.name),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Type: ${task.taskType}'),
-                Text('Date: ${DateFormat.yMMMd().format(task.date)}'),
-                if (task.completedDate != null)
-                  Text(
-                      'Completed: ${DateFormat.yMMMd().format(task.completedDate!)}'),
-                const SizedBox(height: 16),
-                const Text('Pigs in this task:',
-                    style: TextStyle(fontWeight: FontWeight.bold)),
-                Column(
-                  children: task.pigTags.map((tag) => Text(tag)).toList(),
-                ),
-                const SizedBox(height: 16),
-                Text(task.description ?? 'No description'),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("Close"),
-            ),
-            TextButton(
-              onPressed: () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text("Confirm Delete"),
-                    content: Text("Delete ${task.name} task?"),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text("Cancel"),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text("Delete",
-                            style: TextStyle(color: Colors.red)),
-                      ),
-                    ],
-                  ),
-                );
-                Navigator.pop(context, confirmed ?? false);
-              },
-              child: const Text("Delete", style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        ),
-      );
-
-      if (shouldDelete == true && mounted) {
-        await _deleteTask(task);
-      }
-    } else {
-      final result = await Navigator.of(context).push<dynamic>(
-        MaterialPageRoute(
-          builder: (context) => AddEditTaskDialog(
-            allPigs: widget.allPigs,
-            allPigpens: widget.allPigpens,
-            existingTask: task,
-            initialSelectedPigs: task.pigTags,
-            tasksBox: _tasksBox,
-          ),
-        ),
-      );
-
-      if (mounted) {
-        if (result is bool) {
-          if (result) {
-            await _loadTasks();
-          }
-        } else if (result is PigTask) {
-          await _saveTask(result);
-        }
-      }
-    }
-  }
-
   Future<void> _saveTask(PigTask task) async {
     try {
       await _tasksBox.put(task.id, task);
-      await _loadTasks();
+      await _loadTasks(); // This will refresh the list
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Task saved successfully'),
-            backgroundColor: Colors.green, // Success color
+            backgroundColor: Colors.green,
           ),
         );
       }
@@ -523,7 +628,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error saving task: $e'),
-            backgroundColor: Colors.red, // Error color
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -822,6 +927,12 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
   Future<void> _saveTask() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Check if the selected date is today or in the future
+    bool isPending = _selectedDate.isAfter(DateTime.now()) ||
+        (_selectedDate.year == DateTime.now().year &&
+            _selectedDate.month == DateTime.now().month &&
+            _selectedDate.day == DateTime.now().day);
+
     final task = PigTask(
       id: widget.existingTask?.id ??
           DateTime.now().millisecondsSinceEpoch.toString(),
@@ -835,6 +946,12 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
       isCompleted: widget.existingTask?.isCompleted ?? false,
       completedDate: widget.existingTask?.completedDate,
     );
+
+    // If the task is not completed and the date is not set, you can choose to handle it
+    if (!task.isCompleted && !isPending) {
+      // Handle the case where the task is not pending
+      // For example, you can set a default date or show a message
+    }
 
     Navigator.pop(context, task);
   }

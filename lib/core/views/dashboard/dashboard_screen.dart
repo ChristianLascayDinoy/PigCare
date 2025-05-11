@@ -367,18 +367,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final today = DateTime(now.year, now.month, now.day);
 
         // Count pending tasks (due today)
-        final pendingTasks = box.values
-            .where((task) =>
-                !task.isCompleted &&
-                task.date.year == today.year &&
-                task.date.month == today.month &&
-                task.date.day == today.day)
-            .length;
+        final pendingTasks = box.values.where((task) {
+          final taskDate =
+              DateTime(task.date.year, task.date.month, task.date.day);
+          return !task.isCompleted && taskDate.isAtSameMomentAs(today);
+        }).length;
 
         // Count upcoming tasks (due in the future)
-        final upcomingTasks = box.values
-            .where((task) => !task.isCompleted && task.date.isAfter(today))
-            .length;
+        final upcomingTasks = box.values.where((task) {
+          final taskDate =
+              DateTime(task.date.year, task.date.month, task.date.day);
+          return !task.isCompleted && taskDate.isAfter(today);
+        }).length;
+
+        String statusText;
+        Color statusColor;
+
+        if (pendingTasks > 0 && upcomingTasks > 0) {
+          statusText = "$pendingTasks pending, $upcomingTasks upcoming";
+          statusColor = Colors.orange;
+        } else if (pendingTasks > 0) {
+          statusText = "$pendingTasks pending";
+          statusColor = Colors.orange;
+        } else if (upcomingTasks > 0) {
+          statusText = "$upcomingTasks upcoming";
+          statusColor = Colors.blue;
+        } else {
+          statusText = "All caught up";
+          statusColor = Colors.green;
+        }
 
         return Row(
           mainAxisSize: MainAxisSize.min,
@@ -389,14 +406,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   const TextSpan(text: "Tasks: "),
                   TextSpan(
-                    text: (pendingTasks > 0 || upcomingTasks > 0)
-                        ? "${pendingTasks} pending, ${upcomingTasks} upcoming"
-                        : "All caught up",
-                    style: TextStyle(
-                      color: (pendingTasks > 0 || upcomingTasks > 0)
-                          ? Colors.orange
-                          : Colors.green,
-                    ),
+                    text: statusText,
+                    style: TextStyle(color: statusColor),
                   ),
                 ],
               ),

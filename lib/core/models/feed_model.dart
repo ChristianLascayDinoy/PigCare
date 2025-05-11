@@ -66,11 +66,13 @@ class Feed extends HiveObject {
     );
   }
 
+  // In feed_model.dart
   void deductFeed(double amount) {
+    if (amount <= 0) throw Exception('Invalid deduction amount');
+    if (amount > remainingQuantity)
+      throw Exception('Not enough feed available');
+
     remainingQuantity -= amount;
-    if (remainingQuantity < 0) {
-      remainingQuantity = 0; // Prevent negative stock
-    }
-    save(); // Save the update to Hive
+    if (remainingQuantity < 0) remainingQuantity = 0;
   }
 }

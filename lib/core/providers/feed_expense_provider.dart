@@ -23,6 +23,18 @@ class FeedExpenseProvider with ChangeNotifier {
     }
   }
 
+  // In your FeedExpenseProvider class
+  Future<void> deductFeedQuantity(String feedId, double amount) async {
+    final feedBox = await Hive.openBox<Feed>('feedsBox');
+    final feed = feedBox.get(feedId);
+
+    if (feed != null) {
+      feed.deductFeed(amount);
+      await feedBox.put(feed.id, feed);
+      notifyListeners(); // This triggers UI updates
+    }
+  }
+
   // Add a new feed and its corresponding expense
   Future<void> addFeedWithExpense(Feed feed) async {
     final expense = Expense(

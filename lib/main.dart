@@ -35,7 +35,8 @@ void main() async {
     final notificationService = NotificationService();
     await notificationService.initialize();
     await _rescheduleAllNotifications();
-    await checkPendingFeedings();
+    await _checkPendingFeedings();
+    await notificationService.checkMissedSchedules();
 
     // Now run the actual app with the provider
     runApp(
@@ -89,7 +90,9 @@ class _ErrorApp extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green[700],
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 30, vertical: 15),
+                      horizontal: 30,
+                      vertical: 15,
+                    ),
                   ),
                   onPressed: () => main(),
                   child: const Text(
@@ -106,6 +109,7 @@ class _ErrorApp extends StatelessWidget {
   }
 }
 
+// Initialization Functions
 Future<void> _initializeHive() async {
   await Hive.initFlutter();
 
@@ -175,6 +179,7 @@ Future<bool> _getIntroCompletedStatus() async {
   return settingsBox.get('introCompleted', defaultValue: false) ?? false;
 }
 
+// Data Migration Functions
 Future<void> _migratePigpenReferences() async {
   final pigBox = Hive.box<Pig>('pigs');
   final pigpenBox = Hive.box<Pigpen>('pigpens');
@@ -259,6 +264,7 @@ Future<void> _assignToUnassigned(
   );
 }
 
+// Feeding Schedule Functions
 Future<void> _rescheduleAllNotifications() async {
   try {
     final notificationService = NotificationService();
@@ -276,6 +282,7 @@ Future<void> _rescheduleAllNotifications() async {
             'Feed ${schedule.quantity} kg of ${schedule.feedType} in ${schedule.pigpenId}',
         time: TimeOfDay(hour: hour, minute: minute),
         date: schedule.date,
+        payload: schedule.id, // Pass schedule ID as payload
       );
     }
   } catch (e) {
@@ -283,17 +290,31 @@ Future<void> _rescheduleAllNotifications() async {
   }
 }
 
-Future<void> checkPendingFeedings() async {
+Future<void> _checkPendingFeedings() async {
   try {
     final now = DateTime.now();
-    final currentTime = TimeOfDay.fromDateTime(now);
     final box = await Hive.openBox<FeedingSchedule>('feedingSchedules');
 
     for (final schedule in box.values) {
-      if (!schedule.isFeedDeducted &&
-          schedule.date.isBefore(now) &&
-          isTimePassed(schedule.timeOfDay, currentTime)) {
-        await schedule.executeFeeding();
+      if (!schedule.isFeedDeducted) {
+        final scheduleDate = DateTime(
+          schedule.date.year,
+          schedule.date.month,
+          schedule.date.day,
+        );
+        final today = DateTime(now.year, now.month, now.day);
+
+        // Check if schedule date is today or in the past
+        if (scheduleDate.isBefore(today) ||
+            scheduleDate.isAtSameMomentAs(today)) {
+          final scheduleTime = schedule.timeOfDay;
+          final currentTime = TimeOfDay.fromDateTime(now);
+
+          // Check if scheduled time has passed today
+          if (isTimePassed(scheduleTime, currentTime)) {
+            await schedule.executeFeeding();
+          }
+        }
       }
     }
   } catch (e) {
@@ -304,10 +325,13 @@ Future<void> checkPendingFeedings() async {
 bool isTimePassed(TimeOfDay scheduledTime, TimeOfDay currentTime) {
   if (scheduledTime.hour < currentTime.hour) return true;
   if (scheduledTime.hour == currentTime.hour &&
-      scheduledTime.minute <= currentTime.minute) return true;
+      scheduledTime.minute <= currentTime.minute) {
+    return true;
+  }
   return false;
 }
 
+// Main App Widget
 class PigCareApp extends StatelessWidget {
   const PigCareApp({super.key});
 

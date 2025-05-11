@@ -95,6 +95,7 @@ class NotificationService {
     await _notificationsPlugin.cancelAll();
   }
 
+// In NotificationService.dart
   Future<void> handleNotificationResponse(String? payload) async {
     if (payload == null) return;
 
@@ -104,9 +105,40 @@ class NotificationService {
 
       if (schedule != null && !schedule.isFeedDeducted) {
         await schedule.executeFeeding();
+
+        // Update the schedule in Hive
+        schedule.isFeedDeducted = true;
+        await box.put(schedule.id, schedule);
       }
     } catch (e) {
       debugPrint('Error handling feeding notification: $e');
+      // You might want to show a notification that the feeding failed
+    }
+  }
+
+  // In NotificationService.dart
+  Future<void> checkMissedSchedules() async {
+    final now = DateTime.now();
+    final box = await Hive.openBox<FeedingSchedule>('feedingSchedules');
+
+    for (final schedule in box.values) {
+      final scheduleTime = schedule.timeOfDay;
+      final scheduleDateTime = DateTime(
+        now.year,
+        now.month,
+        now.day,
+        scheduleTime.hour,
+        scheduleTime.minute,
+      );
+
+      // If the schedule time has passed today and feed wasn't deducted
+      if (scheduleDateTime.isBefore(now) && !schedule.isFeedDeducted) {
+        try {
+          await schedule.executeFeeding();
+        } catch (e) {
+          debugPrint('Failed to execute missed schedule: $e');
+        }
+      }
     }
   }
 }

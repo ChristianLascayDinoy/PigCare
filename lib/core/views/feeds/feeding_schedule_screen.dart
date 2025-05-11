@@ -34,6 +34,23 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
   bool assignToAll = false;
   bool isLoading = true;
 
+  int _timeToMinutes(String time) {
+    final parts = time.split(' ');
+    final timeParts = parts[0].split(':');
+    var hour = int.parse(timeParts[0]);
+    final minute = int.parse(timeParts[1]);
+
+    if (parts.length > 1) {
+      if (parts[1].toUpperCase() == 'PM' && hour != 12) {
+        hour += 12;
+      } else if (parts[1].toUpperCase() == 'AM' && hour == 12) {
+        hour = 0;
+      }
+    }
+
+    return hour * 60 + minute;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -341,26 +358,34 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
   }
 
   Widget _buildFeedDropdown() {
-    return DropdownButtonFormField<Feed>(
-      decoration: const InputDecoration(
-        labelText: "Select Feed Type*",
-        border: OutlineInputBorder(),
-        filled: true,
-        fillColor: Colors.white,
-      ),
-      value: selectedFeed,
-      items: feeds
-          .map((feed) => DropdownMenuItem(
-                value: feed,
-                child: Text(
-                  "${feed.name} (${feed.remainingQuantity.toStringAsFixed(2)} kg)",
-                  style: TextStyle(
-                    color: feed.remainingQuantity < 5 ? Colors.red : null,
-                  ),
-                ),
-              ))
-          .toList(),
-      onChanged: (feed) => setState(() => selectedFeed = feed),
+    return ValueListenableBuilder<Box<Feed>>(
+      valueListenable: feedBox.listenable(),
+      builder: (context, box, _) {
+        final availableFeeds =
+            box.values.where((f) => f.remainingQuantity > 0).toList();
+
+        return DropdownButtonFormField<Feed>(
+          decoration: const InputDecoration(
+            labelText: "Select Feed Type*",
+            border: OutlineInputBorder(),
+            filled: true,
+            fillColor: Colors.white,
+          ),
+          value: selectedFeed,
+          items: availableFeeds
+              .map((feed) => DropdownMenuItem(
+                    value: feed,
+                    child: Text(
+                      "${feed.name} (${feed.remainingQuantity.toStringAsFixed(2)} kg)",
+                      style: TextStyle(
+                        color: feed.remainingQuantity < 5 ? Colors.red : null,
+                      ),
+                    ),
+                  ))
+              .toList(),
+          onChanged: (feed) => setState(() => selectedFeed = feed),
+        );
+      },
     );
   }
 
@@ -460,6 +485,11 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
       valueListenable: feedingScheduleBox.listenable(),
       builder: (context, Box<FeedingSchedule> box, _) {
         final schedules = box.values.toList().cast<FeedingSchedule>();
+
+        // Sort schedules by time (AM to PM)
+        schedules.sort((a, b) {
+          return _timeToMinutes(a.time).compareTo(_timeToMinutes(b.time));
+        });
 
         if (schedules.isEmpty) {
           return const Center(
