@@ -775,7 +775,7 @@ class _AddEditSaleDialogState extends State<AddEditSaleDialog> {
                       return DropdownMenuItem(
                         value: pig,
                         child: Text(
-                            "Tag: ${pig.tag} - (${pig.name ?? 'No name'})"),
+                            "Tag: ${pig.tag} • ${pig.genderSymbol} • ${pig.getFormattedAge()}"),
                       );
                     }).toList(),
                     onChanged: (pig) => setState(() => _selectedPig = pig),

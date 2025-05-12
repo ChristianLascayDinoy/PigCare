@@ -79,6 +79,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           const SnackBar(
             content: Text('Task successfully deleted'),
             duration: Duration(seconds: 2),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -88,6 +89,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
           SnackBar(
             content: Text('Error deleting task: $e'),
             duration: Duration(seconds: 2),
+            backgroundColor: Colors.red,
           ),
         );
       }
@@ -144,12 +146,6 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                   'Completed on: ${DateFormat('MMM dd, yyyy').format(task.completedDate!)}',
                 ),
               ],
-              SizedBox(height: 8),
-              Chip(
-                label:
-                    Text(task.taskType, style: TextStyle(color: Colors.white)),
-                backgroundColor: _getTaskTypeColor(task.taskType),
-              ),
               SizedBox(height: 16),
               if (task.description?.isNotEmpty ?? false) ...[
                 Text('Description:',
@@ -508,7 +504,7 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                             iconColor: Colors.blue,
                           ),
                         ),
-                        if (!task.isCompleted) ...[
+                        if (!task.isCompleted)
                           const PopupMenuItem<String>(
                             value: 'edit',
                             child: ListTile(
@@ -517,15 +513,14 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
                               iconColor: Colors.blue,
                             ),
                           ),
-                          const PopupMenuItem<String>(
-                            value: 'delete',
-                            child: ListTile(
-                              leading: Icon(Icons.delete, color: Colors.red),
-                              title: Text('Delete',
-                                  style: TextStyle(color: Colors.red)),
-                            ),
+                        const PopupMenuItem<String>(
+                          value: 'delete',
+                          child: ListTile(
+                            leading: Icon(Icons.delete, color: Colors.red),
+                            title: Text('Delete',
+                                style: TextStyle(color: Colors.red)),
                           ),
-                        ],
+                        ),
                       ],
                       onSelected: (String value) async {
                         switch (value) {
@@ -579,13 +574,15 @@ class _TaskManagementScreenState extends State<TaskManagementScreen> {
         await _loadTasks();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Task marked as complete')),
+            const SnackBar(
+                content: Text('Task marked as complete'),
+                backgroundColor: Colors.green),
           );
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
+            SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
           );
         }
       }
@@ -892,7 +889,8 @@ class _AddEditTaskDialogState extends State<AddEditTaskDialog> {
                     itemBuilder: (context, index) {
                       final pig = _pigsInSelectedPen[index];
                       return CheckboxListTile(
-                        title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
+                        title: Text(
+                            "Tag: ${pig.tag} • ${pig.genderSymbol} • ${pig.getFormattedAge()}"),
                         value: _selectedPigTags.contains(pig.tag),
                         onChanged: (selected) {
                           setState(() {

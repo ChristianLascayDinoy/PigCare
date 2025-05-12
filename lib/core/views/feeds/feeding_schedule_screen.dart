@@ -336,7 +336,8 @@ class _AddFeedingScheduleScreenState extends State<AddFeedingScheduleScreen> {
                 itemBuilder: (context, index) {
                   final pig = pigsInSelectedPen[index];
                   return CheckboxListTile(
-                    title: Text("${pig.name ?? 'Unnamed'} (${pig.tag})"),
+                    title: Text(
+                        "Tag: ${pig.tag} • ${pig.genderSymbol} • ${pig.getFormattedAge()}"),
                     value: selectedPigs.contains(pig),
                     onChanged: (bool? value) {
                       setState(() {

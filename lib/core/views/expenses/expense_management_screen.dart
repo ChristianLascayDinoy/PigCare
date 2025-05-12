@@ -1011,7 +1011,8 @@ class _AddEditExpenseDialogState extends State<AddEditExpenseDialog> {
                     itemBuilder: (context, index) {
                       final pig = _pigsInSelectedPen[index];
                       return CheckboxListTile(
-                        title: Text("${pig.tag} - ${pig.name ?? 'No name'}"),
+                        title: Text(
+                            "Tag: ${pig.tag} • ${pig.genderSymbol} • ${pig.getFormattedAge()}"),
                         value: _selectedPigTags.contains(pig.tag),
                         onChanged: (selected) {
                           setState(() {
