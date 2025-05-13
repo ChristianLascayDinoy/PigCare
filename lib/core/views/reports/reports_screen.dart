@@ -143,6 +143,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
 
+    // Group pigs by pigpen
+    final byPigpen = <int, List<Pig>>{};
+    for (final pig in pigs) {
+      final key = pig.pigpenKey ?? -1; // Use -1 for unassigned
+      byPigpen.putIfAbsent(key, () => []).add(pig);
+    }
+
+    final sowsWithOffspring = <String, Map<String, dynamic>>{};
+    final boarsWithOffspring = <String, Map<String, dynamic>>{};
+
+    for (final pig in pigs) {
+      final tag = pig.tag;
+      final offspring =
+          pigs.where((p) => p.motherTag == tag || p.fatherTag == tag).toList();
+
+      if (offspring.isNotEmpty) {
+        final maleCount = offspring.where((o) => o.gender == 'Male').length;
+        final femaleCount = offspring.where((o) => o.gender == 'Female').length;
+
+        final data = {
+          'offspringCount': offspring.length,
+          'maleOffspring': maleCount,
+          'femaleOffspring': femaleCount,
+        };
+
+        if (pig.stage == 'Sow') {
+          sowsWithOffspring[tag] = data;
+        } else if (pig.stage == 'Boar') {
+          boarsWithOffspring[tag] = data;
+        }
+      }
+    }
+
     return {
       'totalPigs': pigs.length,
       'byGender': {
@@ -159,6 +192,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
       },
       'byAge': ageGroups,
       'averageAge': _calculateAverageAge(pigs),
+      'byPigpen':
+          byPigpen.map((key, value) => MapEntry(key.toString(), value.length)),
+      'sowsWithOffspring': sowsWithOffspring,
+      'boarsWithOffspring': boarsWithOffspring,
     };
   }
 
@@ -272,15 +309,25 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Future<Map<String, dynamic>> _calculateTaskReports() async {
-    final tasks = _tasksBox.values
-        .where((e) =>
-            e.date.isAfter(_dateRange.start) && e.date.isBefore(_dateRange.end))
-        .toList();
+    // Get all tasks without filtering by date range
+    final tasks = _tasksBox.values.toList();
 
     if (tasks.isEmpty) return {};
 
+    // Count completed, pending, and upcoming tasks
+    int completedCount = tasks.where((e) => e.isCompleted).length;
+    int pendingCount = tasks
+        .where((e) => !e.isCompleted && e.date.isBefore(DateTime.now()))
+        .length;
+    int upcomingCount = tasks
+        .where((e) => !e.isCompleted && e.date.isAfter(DateTime.now()))
+        .length;
+
     return {
       'totalEvents': tasks.length,
+      'completedCount': completedCount,
+      'pendingCount': pendingCount,
+      'upcomingCount': upcomingCount,
       'byType': {
         'health': tasks.where((e) => e.taskType == 'Health').length,
         'breeding': tasks.where((e) => e.taskType == 'Breeding').length,
@@ -288,30 +335,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         'movement': tasks.where((e) => e.taskType == 'Movement').length,
         'other': tasks.where((e) => e.taskType == 'Other').length,
       },
-      'completionRate': tasks.where((e) => e.isCompleted).length / tasks.length,
-    };
-  }
-
-  Future<Map<String, dynamic>> _calculateFinancialSummary() async {
-    final sales = _salesBox.values
-        .where((s) =>
-            s.date.isAfter(_dateRange.start) && s.date.isBefore(_dateRange.end))
-        .toList();
-
-    final expenses = _expensesBox.values
-        .where((e) =>
-            e.date.isAfter(_dateRange.start) && e.date.isBefore(_dateRange.end))
-        .toList();
-
-    final totalSales = sales.fold(0.0, (sum, s) => sum + s.amount);
-    final totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
-    final netProfit = totalSales - totalExpenses;
-
-    return {
-      'totalSales': totalSales,
-      'totalExpenses': totalExpenses,
-      'netProfit': netProfit,
-      'profitMargin': totalSales > 0 ? (netProfit / totalSales) * 100 : 0,
+      'completionRate': tasks.isNotEmpty ? completedCount / tasks.length : 0,
     };
   }
 
@@ -348,24 +372,69 @@ class _ReportsScreenState extends State<ReportsScreen> {
     double total = sales.fold(0, (sum, s) => sum + s.amount);
     Map<String, dynamic> byPigType = {};
 
+    // Prepare sales details for the chart
+    List<Map<String, dynamic>> salesDetails = [];
+
     for (final sale in sales) {
       try {
         final pig = widget.allPigs.firstWhere((p) => p.tag == sale.pigTag);
         final type = pig.stage;
+
+        // Add to sales details for the chart
+        salesDetails.add({
+          'tag': sale.pigTag,
+          'amount': sale.amount,
+          'date': sale.date,
+        });
+
+        // Group by pig type
         byPigType[type] = {
           'count': (byPigType[type]?['count'] ?? 0) + 1,
           'total': (byPigType[type]?['total'] ?? 0) + sale.amount,
         };
       } catch (e) {
         // Pig not found
+        salesDetails.add({
+          'tag': 'Unknown',
+          'amount': sale.amount,
+          'date': sale.date,
+        });
       }
     }
+
+    // Sort sales by amount (descending)
+    salesDetails
+        .sort((a, b) => (b['amount'] as num).compareTo(a['amount'] as num));
 
     return {
       'total': total,
       'count': sales.length,
       'average': total / sales.length,
       'byPigType': byPigType,
+      'salesDetails': salesDetails, // Add this for the chart
+    };
+  }
+
+  Future<Map<String, dynamic>> _calculateFinancialSummary() async {
+    final sales = _salesBox.values
+        .where((s) =>
+            s.date.isAfter(_dateRange.start) && s.date.isBefore(_dateRange.end))
+        .toList();
+
+    final expenses = _expensesBox.values
+        .where((e) =>
+            e.date.isAfter(_dateRange.start) && e.date.isBefore(_dateRange.end))
+        .toList();
+
+    final totalSales = sales.fold(0.0, (sum, s) => sum + s.amount);
+    final totalExpenses = expenses.fold(0.0, (sum, e) => sum + e.amount);
+    final netProfit = totalSales - totalExpenses;
+
+    return {
+      'totalSales': totalSales,
+      'totalExpenses': totalExpenses,
+      'netProfit': netProfit,
+      'profitMargin': totalSales > 0 ? (netProfit / totalSales) * 100 : 0,
     };
   }
 
@@ -427,10 +496,6 @@ class _ReportsScreenState extends State<ReportsScreen> {
             pw.SizedBox(height: 20),
 
             _buildPdfReportSection(
-                'Financial Summary', _buildFinancialSummaryPdfContent()),
-            pw.SizedBox(height: 20),
-
-            _buildPdfReportSection(
                 'Feed Report',
                 feedReports.isEmpty
                     ? pw.Text('No feed data available')
@@ -456,6 +521,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 salesReports.isEmpty
                     ? pw.Text('No sales data available')
                     : _buildSalesReportPdfContent()),
+
+            _buildPdfReportSection(
+                'Financial Summary', _buildFinancialSummaryPdfContent()),
+            pw.SizedBox(height: 20),
           ],
         ),
       );
@@ -553,29 +622,33 @@ class _ReportsScreenState extends State<ReportsScreen> {
             '2+ years', pigReports['byAge']['2+ years'].toString()),
         _buildPdfReportItem('Average Age',
             '${pigReports['averageAge'].toStringAsFixed(1)} months'),
-      ],
-    );
-  }
-
-  pw.Widget _buildFinancialSummaryPdfContent() {
-    final currencyFormat = NumberFormat.currency(symbol: '₱');
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      children: [
-        _buildPdfReportItem('Total Sales',
-            currencyFormat.format(financialSummary['totalSales'])),
-        _buildPdfReportItem('Total Expenses',
-            currencyFormat.format(financialSummary['totalExpenses'])),
-        _buildPdfReportItem(
-          'Net Profit',
-          currencyFormat.format(financialSummary['netProfit']),
-          isPositive: financialSummary['netProfit'] >= 0,
-        ),
-        _buildPdfReportItem(
-          'Profit Margin',
-          '${financialSummary['profitMargin'].toStringAsFixed(2)}%',
-          isPositive: financialSummary['profitMargin'] >= 0,
-        ),
+        pw.SizedBox(height: 10),
+        pw.Text('By Pigpen:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        ...pigReports['byPigpen'].entries.map((entry) {
+          return _buildPdfReportItem(
+              'Pigpen ${entry.key}', entry.value.toString());
+        }),
+        pw.SizedBox(height: 10),
+        pw.Text('Sows With Offspring:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        ...pigReports['sowsWithOffspring'].entries.map((entry) {
+          final data = entry.value;
+          return pw.Column(children: [
+            _buildPdfReportItem('Sow Tag: ${entry.key}',
+                'Total: ${data['offspringCount']}, Male: ${data['maleOffspring']}, Female: ${data['femaleOffspring']}'),
+          ]);
+        }),
+        pw.SizedBox(height: 10),
+        pw.Text('Boars With Offspring:',
+            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+        ...pigReports['boarsWithOffspring'].entries.map((entry) {
+          final data = entry.value;
+          return pw.Column(children: [
+            _buildPdfReportItem('Boar Tag: ${entry.key}',
+                'Total: ${data['offspringCount']}, Male: ${data['maleOffspring']}, Female: ${data['femaleOffspring']}'),
+          ]);
+        }),
       ],
     );
   }
@@ -637,6 +710,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
       children: [
         _buildPdfReportItem(
             'Total Events', taskReports['totalEvents'].toString()),
+        _buildPdfReportItem(
+            'Completed Tasks', taskReports['completedCount'].toString()),
+        _buildPdfReportItem(
+            'Pending Tasks', taskReports['pendingCount'].toString()),
+        _buildPdfReportItem(
+            'Upcoming Tasks', taskReports['upcomingCount'].toString()),
         _buildPdfReportItem(
           'Completion Rate',
           '${(taskReports['completionRate'] * 100).toStringAsFixed(1)}%',
@@ -705,6 +784,29 @@ class _ReportsScreenState extends State<ReportsScreen> {
             );
           }).toList(),
         ],
+      ],
+    );
+  }
+
+  pw.Widget _buildFinancialSummaryPdfContent() {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _buildPdfReportItem('Total Sales',
+            currencyFormat.format(financialSummary['totalSales'])),
+        _buildPdfReportItem('Total Expenses',
+            currencyFormat.format(financialSummary['totalExpenses'])),
+        _buildPdfReportItem(
+          'Net Profit',
+          currencyFormat.format(financialSummary['netProfit']),
+          isPositive: financialSummary['netProfit'] >= 0,
+        ),
+        _buildPdfReportItem(
+          'Profit Margin',
+          '${financialSummary['profitMargin'].toStringAsFixed(2)}%',
+          isPositive: financialSummary['profitMargin'] >= 0,
+        ),
       ],
     );
   }
@@ -960,8 +1062,39 @@ class _ReportsScreenState extends State<ReportsScreen> {
         const SizedBox(height: 12),
         _buildReportItem(
             "Average Age", "${data['averageAge'].toStringAsFixed(1)} months"),
+        const SizedBox(height: 12),
+        const Text("By Pigpen:", style: TextStyle(fontWeight: FontWeight.bold)),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: (data['byPigpen'] as Map<String, int>).entries.map((entry) {
+            final penLabel =
+                entry.key == '-1' ? 'Unassigned' : 'Pigpen ${entry.key}';
+            return _buildReportItem(penLabel, entry.value.toString());
+          }).toList(),
+        ),
+        const SizedBox(height: 12),
+        const Text("Sows with Offspring:",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        ..._buildParentOffspringList(data['sowsWithOffspring']),
+        const SizedBox(height: 12),
+        const Text("Boars with Offspring:",
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        ..._buildParentOffspringList(data['boarsWithOffspring']),
       ],
     );
+  }
+
+  List<Widget> _buildParentOffspringList(Map<String, dynamic> parentData) {
+    return parentData.entries.map((entry) {
+      final info = entry.value as Map<String, dynamic>;
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4.0),
+        child: Text(
+          "Tag: ${entry.key} | Offspring: ${info['offspringCount']} (M: ${info['maleOffspring']}, F: ${info['femaleOffspring']})",
+        ),
+      );
+    }).toList();
   }
 
   List<PieChartSectionData> _buildFeedTypeSections(
@@ -1155,26 +1288,34 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildTaskReportContent(Map<String, dynamic> data) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildReportItem("Total Tasks", data['totalEvents'].toString()),
-        _buildReportItem("Completion Rate",
-            "${(data['completionRate'] * 100).toStringAsFixed(1)}%"),
-        const SizedBox(height: 12),
-        const Text("By Type:", style: TextStyle(fontWeight: FontWeight.bold)),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            _buildReportItem("Health", data['byType']['health'].toString()),
-            _buildReportItem("Breeding", data['byType']['breeding'].toString()),
-            _buildReportItem("Feeding", data['byType']['feeding'].toString()),
-            _buildReportItem("Movement", data['byType']['movement'].toString()),
-            _buildReportItem("Other", data['byType']['other'].toString()),
-          ],
-        ),
-      ],
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildReportItem("Total Tasks", data['totalEvents'].toString()),
+          _buildReportItem(
+              "Completed Tasks", data['completedCount'].toString()),
+          _buildReportItem("Pending Tasks", data['pendingCount'].toString()),
+          _buildReportItem("Upcoming Tasks", data['upcomingCount'].toString()),
+          _buildReportItem("Completion Rate",
+              "${(data['completionRate'] * 100).toStringAsFixed(1)}%"),
+          const SizedBox(height: 12),
+          const Text("By Type:", style: TextStyle(fontWeight: FontWeight.bold)),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _buildReportItem("Health", data['byType']['health'].toString()),
+              _buildReportItem(
+                  "Breeding", data['byType']['breeding'].toString()),
+              _buildReportItem("Feeding", data['byType']['feeding'].toString()),
+              _buildReportItem(
+                  "Movement", data['byType']['movement'].toString()),
+              _buildReportItem("Other", data['byType']['other'].toString()),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1259,26 +1400,134 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildSalesReportContent(Map<String, dynamic> data) {
+    final currencyFormat = NumberFormat.currency(symbol: '₱');
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildReportItem("Total Sales",
-            NumberFormat.currency(symbol: '₱').format(data['total'])),
-        _buildReportItem("Number of Sales", data['count'].toString()),
-        _buildReportItem("Average Sale",
-            NumberFormat.currency(symbol: '₱').format(data['average'])),
+        _buildReportItem(
+          "Total Sales",
+          currencyFormat.format(data['total']),
+        ),
+        _buildReportItem(
+          "Number of Sales",
+          data['count'].toString(),
+        ),
+        _buildReportItem(
+          "Average Sale",
+          currencyFormat.format(data['average']),
+        ),
+
+        // Add the bar chart for individual sales
+        if (data['salesDetails'] != null &&
+            data['salesDetails'].isNotEmpty) ...[
+          const SizedBox(height: 16),
+          const Text(
+            "Individual Sales:",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          SizedBox(
+            height: 300, // Increased height for better visibility
+            child: BarChart(
+              BarChartData(
+                barGroups: _buildSalesBarGroups(data['salesDetails']),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final sales = data['salesDetails'] as List<dynamic>;
+                        if (value.toInt() >= 0 &&
+                            value.toInt() < sales.length) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8),
+                            child: Text(
+                              sales[value.toInt()]['tag'].toString(),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Colors.black,
+                              ),
+                            ),
+                          );
+                        }
+                        return const Text('');
+                      },
+                      reservedSize: 30,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Text(
+                            currencyFormat.format(value),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: Colors.black,
+                            ),
+                          ),
+                        );
+                      },
+                      reservedSize: 40,
+                    ),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                ),
+                gridData: const FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                ),
+                borderData: FlBorderData(
+                  show: true,
+                  border: Border.all(
+                    color: Colors.grey,
+                    width: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+
         if (data['byPigType'].isNotEmpty) ...[
-          const SizedBox(height: 12),
-          const Text("By Pig Type:",
-              style: TextStyle(fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          const Text(
+            "By Pig Type:",
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
           ...data['byPigType'].entries.map(
                 (entry) => _buildReportItem(
                   entry.key,
-                  "${entry.value['count']} sales (${NumberFormat.currency(symbol: '\$').format(entry.value['total'])})",
+                  "${entry.value['count']} sales (${currencyFormat.format(entry.value['total'])})",
                 ),
               ),
         ],
       ],
+    );
+  }
+
+  List<BarChartGroupData> _buildSalesBarGroups(List<dynamic> salesDetails) {
+    return List<BarChartGroupData>.generate(
+      salesDetails.length,
+      (index) => BarChartGroupData(
+        x: index,
+        barRods: [
+          BarChartRodData(
+            toY: (salesDetails[index]['amount'] as num).toDouble(),
+            color: Colors.green, // Green color for sales
+            width: 16,
+            borderRadius: BorderRadius.circular(4),
+          ),
+        ],
+        showingTooltipIndicators: [0],
+      ),
     );
   }
 
