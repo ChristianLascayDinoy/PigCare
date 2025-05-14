@@ -106,13 +106,27 @@ class FeedingSchedule {
     final notificationService = NotificationService();
     await notificationService.initialize();
 
+    final now = DateTime.now();
+    final scheduledDate = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      timeOfDay.hour,
+      timeOfDay.minute,
+    );
+
+    // If schedule is in the past, schedule for next day
+    final notificationDate = scheduledDate.isBefore(now)
+        ? scheduledDate.add(const Duration(days: 1))
+        : scheduledDate;
+
     await notificationService.scheduleFeedingNotification(
       id: notificationId,
       title: 'Feeding Time for $pigName',
       body: 'Feed $quantity kg of $feedType in $pigpenId',
       time: timeOfDay,
-      date: date,
-      payload: id, // Pass schedule ID to handle when notification is received
+      date: notificationDate, // Use the adjusted date
+      payload: id,
     );
   }
 

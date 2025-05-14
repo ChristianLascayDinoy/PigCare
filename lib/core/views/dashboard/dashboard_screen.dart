@@ -70,8 +70,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _getUpcomingFeedingSchedulesCount() {
     if (!_feedingScheduleBox.isOpen) return 0;
 
-    final now = TimeOfDay.now();
-    final currentTimeInMinutes = now.hour * 60 + now.minute;
+    final now = DateTime.now();
 
     return _feedingScheduleBox.values.where((schedule) {
       try {
@@ -80,11 +79,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
         final scheduleHour = int.tryParse(scheduleTimeParts[0]) ?? 0;
         final scheduleMinute = int.tryParse(scheduleTimeParts[1]) ?? 0;
-        final scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
 
-        // Consider schedules within the next 2 hours as "upcoming"
-        return scheduleTimeInMinutes > currentTimeInMinutes &&
-            scheduleTimeInMinutes <= currentTimeInMinutes + 120;
+        // Get today's date at the scheduled time
+        final scheduleDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          scheduleHour,
+          scheduleMinute,
+        );
+
+        // Calculate time difference in minutes
+        final differenceInMinutes = scheduleDateTime.difference(now).inMinutes;
+
+        // Show if:
+        // 1. The schedule is today
+        // 2. It's within the next 2 hours (including now)
+        return differenceInMinutes >= 0 && differenceInMinutes <= 120;
       } catch (e) {
         return false;
       }
@@ -599,18 +610,32 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _showNotifications() {
     if (!_feedingScheduleBox.isOpen) return;
 
+    final now = DateTime.now();
+
     final upcomingSchedules = _feedingScheduleBox.values.where((schedule) {
       try {
-        final now = TimeOfDay.now();
-        final currentTimeInMinutes = now.hour * 60 + now.minute;
         final scheduleTimeParts = schedule.time.split(':');
         if (scheduleTimeParts.length != 2) return false;
 
         final scheduleHour = int.tryParse(scheduleTimeParts[0]) ?? 0;
         final scheduleMinute = int.tryParse(scheduleTimeParts[1]) ?? 0;
-        final scheduleTimeInMinutes = scheduleHour * 60 + scheduleMinute;
 
-        return scheduleTimeInMinutes > currentTimeInMinutes;
+        // Get today's date at the scheduled time
+        final scheduleDateTime = DateTime(
+          now.year,
+          now.month,
+          now.day,
+          scheduleHour,
+          scheduleMinute,
+        );
+
+        // Calculate time difference in minutes
+        final differenceInMinutes = scheduleDateTime.difference(now).inMinutes;
+
+        // Show if:
+        // 1. The schedule is today
+        // 2. It's within the next 2 hours (including now)
+        return differenceInMinutes >= 0 && differenceInMinutes <= 120;
       } catch (e) {
         return false;
       }
