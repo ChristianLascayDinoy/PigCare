@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import 'package:hive/hive.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:pigcare/core/models/feed_model.dart';
+import 'package:pigcare/core/models/pigpen_model.dart';
 import '../../models/pig_model.dart';
 import '../../models/expense_model.dart';
 import '../../models/sale_model.dart';
@@ -143,17 +144,22 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
     }
 
-    // Group pigs by pigpen
-    final byPigpen = <int, List<Pig>>{};
+    // Group pigs by pigpen with names
+    final byPigpen = <String, List<Pig>>{};
+    final pigpenBox = await Hive.openBox<Pigpen>('pigpens');
+
     for (final pig in pigs) {
-      final key = pig.pigpenKey ?? -1; // Use -1 for unassigned
-      byPigpen.putIfAbsent(key, () => []).add(pig);
+      String pigpenName = 'Unassigned';
+      if (pig.pigpenKey != null) {
+        final pigpen = pigpenBox.get(pig.pigpenKey);
+        pigpenName = pigpen?.name ?? 'Unassigned';
+      }
+      byPigpen.putIfAbsent(pigpenName, () => []).add(pig);
     }
 
     final sowsWithOffspring = <String, Map<String, dynamic>>{};
-    final boarsWithOffspring = <String, Map<String, dynamic>>{};
 
-    for (final pig in pigs) {
+    for (final pig in pigs.where((p) => p.stage == 'Sow')) {
       final tag = pig.tag;
       final offspring =
           pigs.where((p) => p.motherTag == tag || p.fatherTag == tag).toList();
@@ -168,11 +174,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           'femaleOffspring': femaleCount,
         };
 
-        if (pig.stage == 'Sow') {
-          sowsWithOffspring[tag] = data;
-        } else if (pig.stage == 'Boar') {
-          boarsWithOffspring[tag] = data;
-        }
+        sowsWithOffspring[tag] = data;
       }
     }
 
@@ -192,10 +194,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
       },
       'byAge': ageGroups,
       'averageAge': _calculateAverageAge(pigs),
-      'byPigpen':
-          byPigpen.map((key, value) => MapEntry(key.toString(), value.length)),
+      'byPigpen': byPigpen.map((key, value) => MapEntry(key, value.length)),
       'sowsWithOffspring': sowsWithOffspring,
-      'boarsWithOffspring': boarsWithOffspring,
     };
   }
 
@@ -369,10 +369,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     if (sales.isEmpty) return {};
 
-    double total = sales.fold(0, (sum, s) => sum + s.amount);
+    double total = sales.fold(0.0, (sum, s) => sum + s.amount);
     Map<String, dynamic> byPigType = {};
-
-    // Prepare sales details for the chart
     List<Map<String, dynamic>> salesDetails = [];
 
     for (final sale in sales) {
@@ -380,29 +378,32 @@ class _ReportsScreenState extends State<ReportsScreen> {
         final pig = widget.allPigs.firstWhere((p) => p.tag == sale.pigTag);
         final type = pig.stage;
 
-        // Add to sales details for the chart
         salesDetails.add({
-          'tag': sale.pigTag,
+          'pigTag': sale.pigTag,
           'amount': sale.amount,
           'date': sale.date,
+          'buyerName': sale.buyerName,
+          'weight': sale.weight,
         });
 
-        // Group by pig type
-        byPigType[type] = {
-          'count': (byPigType[type]?['count'] ?? 0) + 1,
-          'total': (byPigType[type]?['total'] ?? 0) + sale.amount,
-        };
+        if (!byPigType.containsKey(type)) {
+          byPigType[type] = {'count': 0, 'total': 0.0};
+        }
+
+        byPigType[type]['count'] += 1;
+        byPigType[type]['total'] += sale.amount;
       } catch (e) {
         // Pig not found
         salesDetails.add({
-          'tag': 'Unknown',
+          'pigTag': sale.pigTag,
           'amount': sale.amount,
           'date': sale.date,
+          'buyerName': sale.buyerName,
+          'weight': sale.weight,
         });
       }
     }
 
-    // Sort sales by amount (descending)
     salesDetails
         .sort((a, b) => (b['amount'] as num).compareTo(a['amount'] as num));
 
@@ -411,7 +412,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       'count': sales.length,
       'average': total / sales.length,
       'byPigType': byPigType,
-      'salesDetails': salesDetails, // Add this for the chart
+      'salesDetails': salesDetails,
     };
   }
 
@@ -626,29 +627,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
         pw.Text('By Pigpen:',
             style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
         ...pigReports['byPigpen'].entries.map((entry) {
-          return _buildPdfReportItem(
-              'Pigpen ${entry.key}', entry.value.toString());
+          return _buildPdfReportItem(entry.key, entry.value.toString());
         }),
         pw.SizedBox(height: 10),
-        pw.Text('Sows With Offspring:',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        ...pigReports['sowsWithOffspring'].entries.map((entry) {
-          final data = entry.value;
-          return pw.Column(children: [
-            _buildPdfReportItem('Sow Tag: ${entry.key}',
-                'Total: ${data['offspringCount']}, Male: ${data['maleOffspring']}, Female: ${data['femaleOffspring']}'),
-          ]);
-        }),
-        pw.SizedBox(height: 10),
-        pw.Text('Boars With Offspring:',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-        ...pigReports['boarsWithOffspring'].entries.map((entry) {
-          final data = entry.value;
-          return pw.Column(children: [
-            _buildPdfReportItem('Boar Tag: ${entry.key}',
-                'Total: ${data['offspringCount']}, Male: ${data['maleOffspring']}, Female: ${data['femaleOffspring']}'),
-          ]);
-        }),
+        if (pigReports['sowsWithOffspring'].isNotEmpty) ...[
+          pw.Text('Sows With Offspring:',
+              style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+          ...pigReports['sowsWithOffspring'].entries.map((entry) {
+            final data = entry.value;
+            return pw.Column(children: [
+              _buildPdfReportItem('Sow Tag: ${entry.key}',
+                  'Total: ${data['offspringCount']}, Male: ${data['maleOffspring']}, Female: ${data['femaleOffspring']}'),
+            ]);
+          }),
+        ],
       ],
     );
   }
@@ -764,25 +756,62 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
   pw.Widget _buildSalesReportPdfContent() {
     final currencyFormat = NumberFormat.currency(symbol: '₱');
+
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       children: [
         _buildPdfReportItem(
-            'Total Sales', currencyFormat.format(salesReports['total'])),
+            'Total Sales', currencyFormat.format(salesReports['total'] ?? 0)),
         _buildPdfReportItem(
-            'Number of Sales', salesReports['count'].toString()),
-        _buildPdfReportItem(
-            'Average Sale', currencyFormat.format(salesReports['average'])),
-        if (salesReports['byPigType'].isNotEmpty) ...[
+            'Number of Sales', (salesReports['count'] ?? 0).toString()),
+        _buildPdfReportItem('Average Sale',
+            currencyFormat.format(salesReports['average'] ?? 0)),
+
+        // Individual Sales Section
+        if ((salesReports['salesDetails'] as List?)?.isNotEmpty ?? false) ...[
           pw.SizedBox(height: 10),
-          pw.Text('By Pig Type:',
+          pw.Text('Individual Sales:',
               style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-          ...salesReports['byPigType'].entries.map((entry) {
-            return _buildPdfReportItem(
-              entry.key,
-              '${entry.value['count']} sales (${currencyFormat.format(entry.value['total'])})',
-            );
-          }).toList(),
+          pw.SizedBox(height: 5),
+          pw.Table(
+            border: pw.TableBorder.all(color: PdfColors.grey),
+            columnWidths: {
+              0: pw.FlexColumnWidth(2),
+              1: pw.FlexColumnWidth(2),
+            },
+            children: [
+              pw.TableRow(
+                decoration: pw.BoxDecoration(color: PdfColors.grey300),
+                children: [
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text('Pig Tag',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ),
+                  pw.Padding(
+                    padding: const pw.EdgeInsets.all(4),
+                    child: pw.Text('Amount',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                  ),
+                ],
+              ),
+              ...salesReports['salesDetails'].map<pw.TableRow>((sale) {
+                return pw.TableRow(
+                  children: [
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child: pw.Text(sale['pigTag']?.toString() ?? 'N/A'),
+                    ),
+                    pw.Padding(
+                      padding: const pw.EdgeInsets.all(4),
+                      child:
+                          pw.Text(currencyFormat.format(sale['amount'] ?? 0)),
+                    ),
+                  ],
+                );
+              }).toList(),
+            ],
+          ),
         ],
       ],
     );
@@ -1068,30 +1097,26 @@ class _ReportsScreenState extends State<ReportsScreen> {
           spacing: 8,
           runSpacing: 8,
           children: (data['byPigpen'] as Map<String, int>).entries.map((entry) {
-            final penLabel =
-                entry.key == '-1' ? 'Unassigned' : 'Pigpen ${entry.key}';
-            return _buildReportItem(penLabel, entry.value.toString());
+            return _buildReportItem(entry.key, entry.value.toString());
           }).toList(),
         ),
         const SizedBox(height: 12),
-        const Text("Sows with Offspring:",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        ..._buildParentOffspringList(data['sowsWithOffspring']),
-        const SizedBox(height: 12),
-        const Text("Boars with Offspring:",
-            style: TextStyle(fontWeight: FontWeight.bold)),
-        ..._buildParentOffspringList(data['boarsWithOffspring']),
+        if (data['sowsWithOffspring'].isNotEmpty) ...[
+          const Text("Sows With Offspring:",
+              style: TextStyle(fontWeight: FontWeight.bold)),
+          ..._buildParentOffspringList(data['sowsWithOffspring']),
+        ],
       ],
     );
   }
 
-  List<Widget> _buildParentOffspringList(Map<String, dynamic> parentData) {
-    return parentData.entries.map((entry) {
+  List<Widget> _buildParentOffspringList(Map<String, dynamic> sowsData) {
+    return sowsData.entries.map((entry) {
       final info = entry.value as Map<String, dynamic>;
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 4.0),
         child: Text(
-          "Tag: ${entry.key} | Offspring: ${info['offspringCount']} (M: ${info['maleOffspring']}, F: ${info['femaleOffspring']})",
+          "Sow Tag: ${entry.key} | Offspring: ${info['offspringCount']} (M: ${info['maleOffspring']}, F: ${info['femaleOffspring']})",
         ),
       );
     }).toList();
@@ -1400,25 +1425,20 @@ class _ReportsScreenState extends State<ReportsScreen> {
   }
 
   Widget _buildSalesReportContent(Map<String, dynamic> data) {
-    final currencyFormat = NumberFormat.currency(symbol: '₱');
+    final currencyFormat = NumberFormat.compactCurrency(symbol: '₱');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _buildReportItem(
-          "Total Sales",
-          currencyFormat.format(data['total']),
-        ),
-        _buildReportItem(
-          "Number of Sales",
-          data['count'].toString(),
-        ),
+            "Total Sales", currencyFormat.format(data['total'] ?? 0)),
+        _buildReportItem("Number of Sales", data['count']?.toString() ?? '0'),
         _buildReportItem(
           "Average Sale",
-          currencyFormat.format(data['average']),
+          currencyFormat.format(data['average'] ?? 0),
         ),
 
-        // Add the bar chart for individual sales
+        // Individual Sales Chart
         if (data['salesDetails'] != null &&
             data['salesDetails'].isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -1426,8 +1446,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
             "Individual Sales:",
             style: TextStyle(fontWeight: FontWeight.bold),
           ),
+          SizedBox(height: 10),
           SizedBox(
-            height: 300, // Increased height for better visibility
+            height: 300,
             child: BarChart(
               BarChartData(
                 barGroups: _buildSalesBarGroups(data['salesDetails']),
@@ -1436,13 +1457,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     sideTitles: SideTitles(
                       showTitles: true,
                       getTitlesWidget: (value, meta) {
-                        final sales = data['salesDetails'] as List<dynamic>;
+                        final sales = data['salesDetails'];
                         if (value.toInt() >= 0 &&
                             value.toInt() < sales.length) {
                           return Padding(
                             padding: const EdgeInsets.only(top: 8),
                             child: Text(
-                              sales[value.toInt()]['tag'].toString(),
+                              sales[value.toInt()]['pigTag']?.toString() ??
+                                  'N/A',
                               style: const TextStyle(
                                 fontSize: 10,
                                 color: Colors.black,
@@ -1450,7 +1472,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             ),
                           );
                         }
-                        return const Text('');
+                        return const SizedBox.shrink();
                       },
                       reservedSize: 30,
                     ),
@@ -1480,34 +1502,14 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     sideTitles: SideTitles(showTitles: false),
                   ),
                 ),
-                gridData: const FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                ),
+                gridData: const FlGridData(show: true, drawVerticalLine: false),
                 borderData: FlBorderData(
                   show: true,
-                  border: Border.all(
-                    color: Colors.grey,
-                    width: 0.5,
-                  ),
+                  border: Border.all(color: Colors.grey, width: 0.5),
                 ),
               ),
             ),
           ),
-        ],
-
-        if (data['byPigType'].isNotEmpty) ...[
-          const SizedBox(height: 16),
-          const Text(
-            "By Pig Type:",
-            style: TextStyle(fontWeight: FontWeight.bold),
-          ),
-          ...data['byPigType'].entries.map(
-                (entry) => _buildReportItem(
-                  entry.key,
-                  "${entry.value['count']} sales (${currencyFormat.format(entry.value['total'])})",
-                ),
-              ),
         ],
       ],
     );
@@ -1516,18 +1518,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
   List<BarChartGroupData> _buildSalesBarGroups(List<dynamic> salesDetails) {
     return List<BarChartGroupData>.generate(
       salesDetails.length,
-      (index) => BarChartGroupData(
-        x: index,
-        barRods: [
-          BarChartRodData(
-            toY: (salesDetails[index]['amount'] as num).toDouble(),
-            color: Colors.green, // Green color for sales
-            width: 16,
-            borderRadius: BorderRadius.circular(4),
-          ),
-        ],
-        showingTooltipIndicators: [0],
-      ),
+      (index) {
+        final sale = salesDetails[index];
+        return BarChartGroupData(
+          x: index,
+          barRods: [
+            BarChartRodData(
+              toY: (sale['amount'] as num?)?.toDouble() ?? 0,
+              color: Colors.green,
+              width: 16,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
+          showingTooltipIndicators: [0],
+        );
+      },
     );
   }
 
@@ -1654,6 +1659,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
             bottomTitles: AxisTitles(
               sideTitles: SideTitles(
                 showTitles: true,
+                reservedSize: 40, // Add more space below bars for labels
                 getTitlesWidget: (value, meta) {
                   switch (value.toInt()) {
                     case 0:
